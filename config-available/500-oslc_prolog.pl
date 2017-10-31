@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-:- module(conf_oslc_prolog, []).
+:- module('500-oslc_prolog', []).
 
 /** <module> OSLC Prolog
 */
