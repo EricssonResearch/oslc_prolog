@@ -1,5 +1,7 @@
 # OSLC prolog library
 
+<a href="https://travis-ci.org/EricssonResearch/oslc_prolog"><img src="https://travis-ci.org/EricssonResearch/oslc_prolog.svg?branch=master"/></a>
+
 This is a CPACK library for Cliopatria, follows the standard structure. It has support for programmatic OSLC resource manipulation, and custom OSLC service definition (via declaring `oslc_*` handlers with priorities), basic REST resource operations (POST to creation factory, PUT with matching `If-Match` header, GET with `oslc.properties` and `oslc.prefix` parameters, and DELETE). Resource shape validation supports occurs and type checks. REST interface supports all RDF+XML and TURTLE content types on both input and output.
 
 
