@@ -27,6 +27,6 @@
                  foaf:mbox <leonid.mokrushin@ericsson.com> ;
                ] ;
   cpack:primaryRepository [ a cpack:GitRepository ;
-                            cpack:gitURL <https://github.com/EricssonResearch/scott-eu.git>
+                            cpack:gitURL <https://github.com/EricssonResearch/oslc_prolog.git>
                           ] ;
   cpack:description "This is an implementation of OSLC Core 2.0" .
