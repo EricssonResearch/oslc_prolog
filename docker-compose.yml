@@ -1,4 +1,4 @@
-version: '3.5'
+version: '3.3'
 services:
   oslc_prolog:
     image: ${CI_REGISTRY_IMAGE}
