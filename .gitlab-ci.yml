@@ -21,9 +21,13 @@ build_image:
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
     - docker build -t "$CI_REGISTRY_IMAGE" .
     - docker push "$CI_REGISTRY_IMAGE"
+  only:
+    - master
 
 deploy_to_swarm:
   stage: deploy
   script:
     - docker -H $SWARM_MANAGER login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
     - docker -H $SWARM_MANAGER stack deploy -c docker-compose.yml --with-registry-auth oslc_stack
+  only:
+    - master
