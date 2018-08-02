@@ -181,7 +181,10 @@ handle_put(Context) :-
 handle_put0(Context) :-
   once((
     memberchk(if_match(IfMatch), Context.request),
-    atomic_list_concat([_, ReceivedHash, _], '\"', IfMatch)
+    once(
+      atomic_list_concat([_, ReceivedHash, _], '\"', IfMatch)
+    ; ReceivedHash = IfMatch
+    )
   ; oslc_error('Missing or wrong header [If-Match] in PUT request to [~w]', [Context.iri_spec])
   )),
   IRI = Context.iri,
