@@ -59,7 +59,7 @@ shape_rows([H|T], Row) -->
 shape_row(Shape) -->
   {
     once((
-      rdf(Shape, dcterms:description, ShapeDescription)
+      rdf(Shape, dcterms:description, ^^(ShapeDescription, _))
     ; ShapeDescription = ''
     )),
     aggregate_all(count, rdf(Shape, oslc:property, _), PropertyCout),
@@ -176,7 +176,7 @@ oslc_shape(Request) :-
   http_parameters(Request, [ s(Shape, []) ]),
   findall(P, rdf(Shape, oslc:property, P), Properties),
   once((
-    rdf(Shape, dcterms:description, ShapeDescription)
+    rdf(Shape, dcterms:description, ^^(ShapeDescription, _))
   ; ShapeDescription = ''
   )),
   sort(Properties, SortedProperties),
@@ -213,7 +213,7 @@ shape_property_row(Property) -->
   {
     rdf(Property, oslc:propertyDefinition, PropertyDefinition),
     once((
-      rdf(Property, dcterms:description, PropertyDescription)
+      rdf(Property, dcterms:description, ^^(PropertyDescription, _))
     ; PropertyDescription = ''
     )),
     rdf(Property, oslc:occurs, Cardinality),
