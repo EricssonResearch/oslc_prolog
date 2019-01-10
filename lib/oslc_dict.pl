@@ -56,7 +56,7 @@ resource_dict(Subject, Dict, Options) :-
        \+ memberchk(o(Object), SkipList)
     ; true
     ),
-    ( memberchk(dict_property(Module:Custom), Options),
+    ( memberchk(dict_property(Module, Custom), Options),
       T =.. [Custom, Subject, Predicate, Object, Key, Value, Options],
       call(Module:T)
     -> true
@@ -91,7 +91,7 @@ resource_dict_property(_Subject, Predicate, Object, Key, Value, Options) :-
   resource_object_key(Object, Value, Options).
 
 resource_object_key(Object, Key, Options) :-
-  ( memberchk(object_key(Module:Custom), Options),
+  ( memberchk(object_key(Module, Custom), Options),
     T =.. [Custom, Object, Key, Options],
     call(Module:T)
   -> true
