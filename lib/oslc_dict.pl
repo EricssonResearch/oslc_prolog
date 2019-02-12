@@ -78,8 +78,14 @@ flatten_singletons([K-[V]|T], [K-V|T2]) :- !,
 flatten_singletons([H|T], [H|T2]) :-
   flatten_singletons(T, T2).
 
-resource_dict_property(_Subject, Predicate, Value^^_Type, Key, Value, Options) :- !,
-  resource_object_key(Predicate, Key, Options).
+resource_dict_property(_Subject, Predicate, Object, Key, Value, Options) :-
+  rdf_is_literal(Object), !,
+  resource_object_key(Predicate, Key, Options),
+  once((
+    Object = '^^'(Label, _)
+  ; Object = '@'(Label, _)
+  )),
+  atom_string(Value, Label).
 
 resource_dict_property(_Subject, Predicate, Object, Key, Value, Options) :-
   rdf_is_bnode(Object), !,
