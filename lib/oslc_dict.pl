@@ -88,7 +88,21 @@ resource_dict_property(_Subject, Predicate, Object, Key, Value, Options) :-
   atom_string(Value, Label).
 
 resource_dict_property(_Subject, Predicate, Object, Key, Value, Options) :-
+  \+ memberchk(no_decode_list, Options),
+  rdf_list(Object), !,
+  rdf_list(Object, List),
+  resource_object_key(Predicate, Key, Options),
+  maplist(resource_dict_list_element(Options), List, Value).
+
+resource_dict_property(_Subject, Predicate, Object, Key, Value, Options) :-
+  \+ memberchk(no_inline_bnode, Options),
   rdf_is_bnode(Object), !,
+  resource_object_key(Predicate, Key, Options),
+  resource_dict(Object, Value, Options).
+
+resource_dict_property(_Subject, Predicate, Object, Key, Value, Options) :-
+  memberchk(inline(Inline), Options),
+  memberchk(Predicate, Inline), !,
   resource_object_key(Predicate, Key, Options),
   resource_dict(Object, Value, Options).
 
@@ -96,15 +110,20 @@ resource_dict_property(_Subject, Predicate, Object, Key, Value, Options) :-
   resource_object_key(Predicate, Key, Options),
   resource_object_key(Object, Value, Options).
 
+resource_dict_list_element(Options, Object, Value) :-
+  resource_dict(Object, Value, Options).
+
 resource_object_key(Object, Key, Options) :-
   ( memberchk(object_key(Module, Custom), Options),
     T =.. [Custom, Object, Key, Options],
     call(Module:T)
   -> true
   ; once((
+      \+ memberchk(no_label, Options),
       rdf(Object, rdfs:label, Label^^xsd:string),
       atom_string(Key, Label)
-    ; rdf_global_id(_:Key, Object)
+    ; \+ memberchk(no_name, Options),
+      rdf_global_id(_:Key, Object)
     ; Key = Object
     ))
   ).
