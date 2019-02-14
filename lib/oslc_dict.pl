@@ -46,6 +46,12 @@ graph_dict(Graph, Dict, Options) :-
   dict_create(Dict, _, TagDicts).
 
 resource_dict(Subject, Dict, Options) :-
+  \+ memberchk(no_decode_list, Options),
+  rdf_list(Subject), !,
+  rdf_list(Subject, List),
+  maplist(resource_dict_list_element(Options), List, Dict).
+
+resource_dict(Subject, Dict, Options) :-
   findall(Key-Value, (
     ( memberchk(graph(Graph), Options)
     -> rdf(Subject, Predicate, Object, Graph)
@@ -70,7 +76,12 @@ resource_dict(Subject, Dict, Options) :-
   -> true
   ; resource_object_key(Subject, Name, Options)
   ),
-  dict_create(Dict, Name, FlattenKeyValues).
+  dict_create(Dict0, Name, FlattenKeyValues),
+  ( nonvar(Name),
+    memberchk(id(Id), Options)
+  -> Dict = Dict0.put(Id, Name)
+  ; Dict = Dict0
+  ).
 
 flatten_singletons([], []) :- !.
 flatten_singletons([K-[V]|T], [K-V|T2]) :- !,
