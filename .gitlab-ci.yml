@@ -29,6 +29,7 @@ deploy_to_swarm:
   script:
     - echo "$CI_REGISTRY_PASSWORD" | docker -H $SWARM_MANAGER login -u "$CI_REGISTRY_USER" --password-stdin $CI_REGISTRY
     - docker -H $SWARM_MANAGER stack deploy -c docker-compose.yml --with-registry-auth oslc_stack
+  allow_failure: true
   only:
     - master
 
@@ -37,6 +38,7 @@ deploy_to_swarm_erdc:
   script:
     - echo "$CI_REGISTRY_PASSWORD" | docker -H $SWARM_MANAGER_ERDC login -u "$CI_REGISTRY_USER" --password-stdin $CI_REGISTRY
     - docker -H $SWARM_MANAGER_ERDC stack deploy -c docker-compose.yml --with-registry-auth oslc_stack
+  allow_failure: true
   only:
     - master
   tags:
