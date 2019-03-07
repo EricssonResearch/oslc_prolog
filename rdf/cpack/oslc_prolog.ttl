@@ -20,7 +20,7 @@
 @prefix cpack:   <http://cliopatria.swi-prolog.org/schema/cpack#> .
 
 <> a cpack:Library ;
-  cpack:packageName "oslc_prolog" ;
+  cpack:packageName "oslc_prolog"^^rdf:XMLLiteral ;
   dcterms:title "Implementation of OSCL Core 2.0" ;
   cpack:author [ a foaf:Person ;
                  foaf:name "Leonid Mokrushin" ;
