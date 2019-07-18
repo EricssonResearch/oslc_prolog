@@ -15,7 +15,8 @@ limitations under the License.
 */
 
 :- module(json_ld, [
-  json_serialize/2
+  json_serialize/2,
+  json_deserialize/2
 ]).
 
 :- use_module(library(semweb/rdf11)).
@@ -29,20 +30,46 @@ limitations under the License.
 :- rdf_meta json_serialize(r, -).
 :- rdf_meta json_serialize0(r, -).
 :- rdf_meta json_deserialize(-, r).
-:- rdf_meta iri_key(r, -).
+%:- rdf_meta iri_key(r, -).
 :- rdf_meta find_type(r, r, -).
 :- rdf_meta prefixed_iri(r, -, -).
+:- rdf_meta predicate_object(r, -, r, -, -).
 
-oslc_dispatch:serializer(application/'simple-json', 'simple-json').
+% Parser registration
+:- multifile
+    rdf_db:rdf_load_stream/3,
+    rdf_db:rdf_file_type/2.
 
-oslc_dispatch:serialize_response(Out, Graph, 'simple-json') :-
+% Register parser
+rdf_db:rdf_load_stream(jsonld, Stream, Options) :-
+  rdf_db:graph(Options, Graph),
+  ( var(Graph)
+  -> Graph = user
+  ; true
+  ),
+  rdf_transaction((
+    load_json_stream(Stream, Options, Graph),
+    rdf_set_graph(Graph, modified(false))
+  ),
+  loading_graph(Graph)).
+
+rdf_db:rdf_file_type(jsonld,  jsonld).
+
+load_json_stream(Stream, _Module:_Options, Graph) :-
+  %option(graph(Graph), Options),
+  rdf_graph(Graph),
+  json_read_dict(Stream, Json),
+  json_deserialize(Json, Graph).
+
+% Register serialization
+oslc_dispatch:serializer(application/'ld+json', jsonld).
+
+oslc_dispatch:serialize_response(Out, Graph, jsonld) :-
   rdf_graph(Graph),
   once(
     (
       rdf(R, _, _, Graph),
       \+ rdf_is_bnode(R),
-%      oslc_dict:resource_dict(R, Json, [id(id), dict_property(planner_reasoner_server, custom), no_label]),
-%      oslc_dict:resource_dict(R, Json, [no_label, id(id)]),
       json_serialize(R, Json),
       json_write(Out, Json, [width(0)])
     )
@@ -63,12 +90,13 @@ json_serialize0(L, Output, _) :-
  
 json_serialize0(R, Output, _) :-
   rdf_is_iri(R),
-  iri_key(R, Id),
-  Output = json{}.put('@id', Id).
+  %iri_key(R, Id),
+  prefixed_iri(R, _, Id),
+  Output = json{}.put('@id', Id), !.
 
 json_serialize0(R, Output, _) :-
-  rdf_is_bnode(R), !,
-  json_serialize(R, Output, false).
+  rdf_is_bnode(R),
+  json_serialize(R, Output, false), !.
 
 json_serialize(R, Output) :-
   json_serialize(R, Output, true).
@@ -76,12 +104,13 @@ json_serialize(R, Output) :-
 json_serialize(R, Output, AddContext) :-
   rdf_global_id(rdf:type, IsType),
   findall(
-    Key-Output1-Prefix,
+    % wont be able to have different prefixes in key and value
+    Key-Value-Prefix,
     ( 
       rdf(R, P, O),
-      ( P = IsType
-      -> Key = '@type', type_decl(O, Output1, Prefix)
-      ; prefixed_iri(P, Prefix, Key), json_serialize0(O, Output1, AddContext)
+      ( P = IsType % more readable than predicate_object
+      -> Key = '@type', prefixed_iri(O, Prefix, Value)
+      ; prefixed_iri(P, Prefix, Key), json_serialize0(O, Value, AddContext)
       )
     ),
     PropsPrefixes
@@ -101,16 +130,23 @@ json_serialize(R, Output, AddContext) :-
   ),
   Output = Id.put(Flat).
 
-type_decl(T, Output, Prefix) :-
-  rdf_iri(T),
-  rdf_global_id(Prefix:Local, T),
-  string_concat(Prefix, ":", P),
-  string_concat(P, Local, S),
-  atom_string(Output, S).
+predicate_object(P, Key, O, Value, Prefix, AddContext) :-
+  prefixed_iri(P, Prefix, Key),
+  json_serialize0(O, Value, AddContext).
 
-type_decl(T, Output, AddContext) :-
-  rdf_is_bnode(T),
-  json_serialize0(T, Output, AddContext).
+predicate_object(rdf:type, '@tyoe', O, Value, Prefix, _) :-
+  prefixed_iri(O, Prefix, Value).
+
+% type_decl(T, Output, Prefix) :-
+%   rdf_iri(T),
+%   rdf_global_id(Prefix:Local, T),
+%   string_concat(Prefix, ":", P),
+%   string_concat(P, Local, S),
+%   atom_string(Output, S).
+
+% type_decl(T, Output, AddContext) :-
+%   rdf_is_bnode(T),
+%   json_serialize0(T, Output, AddContext).
 
 prefixed_iri(IRI, 'rdf', PK) :-
   PK = '@type',
@@ -128,39 +164,39 @@ prefixed_iri(IRI, Prefix, PK) :-
 
 %%%%%%%%%%%%%
 
-iri_key(P, K) :-
-  rdf_iri(P),
-  rdf_current_prefix(rdf, Prefix),
-  string_concat(Prefix, Name, P),
-  string_concat("@", Name, S),
-  atom_string(K, S),
-  !.
+% iri_key(P, K) :-
+%   rdf_iri(P),
+%   rdf_current_prefix(rdf, Prefix),
+%   string_concat(Prefix, Name, P),
+%   string_concat("@", Name, S),
+%   atom_string(K, S),
+%   !.
 
-iri_key(P, K) :-
-  rdf_iri(P),
-  rdf_current_prefix(Alias, Prefix),
-  string_concat(Prefix, Name, P),
-  string_concat(Alias, ":", Alias1),
-  string_concat(Alias1, Name, S),
-  atom_string(K, S),
-  !.
+% iri_key(P, K) :-
+%   rdf_iri(P),
+%   rdf_current_prefix(Alias, Prefix),
+%   string_concat(Prefix, Name, P),
+%   string_concat(Alias, ":", Alias1),
+%   string_concat(Alias1, Name, S),
+%   atom_string(K, S),
+%   !.
 
-iri_key(P, K) :-
-  P = K.
+% iri_key(P, K) :-
+%   P = K.
 
-% same as flatten singletons
+% % same as flatten singletons
 
-flatten_simple_lists([], []).
+% flatten_simple_lists([], []).
 
-%flatten_simple_lists([K-V|[]], K-V).
+% %flatten_simple_lists([K-V|[]], K-V).
 
-flatten_simple_lists([K-[V]|T], [K-V|T1]) :-
-  flatten_simple_lists(T, T1), !.
+% flatten_simple_lists([K-[V]|T], [K-V|T1]) :-
+%   flatten_simple_lists(T, T1), !.
 
-flatten_simple_lists([K-V|T], [K-V|T1]) :-
-  flatten_simple_lists(T, T1).
+% flatten_simple_lists([K-V|T], [K-V|T1]) :-
+%   flatten_simple_lists(T, T1).
 
-%------- from oslc_dict
+% %------- from oslc_dict
 
 flatten_singletons([], []) :- !.
 flatten_singletons([K-[V]|T], [K-V|T2]) :- !,
@@ -168,74 +204,69 @@ flatten_singletons([K-[V]|T], [K-V|T2]) :- !,
 flatten_singletons([H|T], [H|T2]) :-
   flatten_singletons(T, T2).
 
-%--------
+% %--------
 
 
-show_records([]).
-show_records([K=V|T]) :-
-  format('~w\t=\t~w\n',[K, V]),
-  show_records(T).
-
-:- multifile
-    rdf_db:rdf_load_stream/3,
-    rdf_db:rdf_file_type/2.
+% show_records([]).
+% show_records([K=V|T]) :-
+%   format('~w\t=\t~w\n',[K, V]),
+%   show_records(T).
 
 
-% Register parser
-rdf_db:rdf_load_stream('simple-json', Stream, Options) :-
-  rdf_db:graph(Options, Graph),
-  ( var(Graph)
-  -> Graph = user
-  ; true
-  ),
-  rdf_transaction((
-    load_json_stream(Stream, Options, Graph),
-    rdf_set_graph(Graph, modified(false))
-  ),
-  loading_graph(Graph)).
+json_deserialize(_, _).
+
+% json_deserialize(Json, Graph) :-
+%   (get_dict('@context', Json, Ctx)
+%   -> true
+%   ; Ctx = json{}
+%   ),
+%   ( get_dict('@type', Json, _Clazz)
+%   ->  %find_type(Ctx, Clazz, Class),
+%       rdf_assert(Ctx, rdf:type, _Class, Graph)
+%   ; true
+%   ),
+%   json_deserialize0(Ctx, Json, Graph).
+
+% json_deserialize0(Context, Dict, Graph) :-
+%   is_of_type(dict,Dict),
+%   forall(
+%     get_dict(Key, Dict, Value),
+%     ( 
+%       iri_key(P, Key),
+%       json_deserialize0(P, Value, Graph),
+%       create_property(Context, Key, Value, Graph)
+%     )
+%   ).
+
+% json_deserialize0(Context, Value, _Graph) :-
+%   format('~w\t=\t~w\n',[Context, Value]).
 
 
-rdf_db:rdf_file_type(sjson,  'simple-json').
+%%%%%%%%%%%%%%%%%%%%
 
-load_json_stream(Stream, _Module:Options, Graph) :-
-  %option(graph(Graph), Options),
-  rdf_graph(Graph),
-  json_read_dict(Stream, Json),
-  json_deserialize(Json, Graph).
+json3(_, [], _, _).
 
-json_deserialize(Json, Graph) :-
-  get_dict('@context', Json, Ref),
-  get_dict('@type', Json, Clazz),
-  iri_key(Ctx, Ref),
-  find_type(Ctx, Clazz, Class),
-  rdf_assert(Ctx, rdf:type, Class, Graph),
-  json_deserialize0(Ctx, Json, Graph).
+json3(Id, [H|[]], _Graph, Context) :-
+  json3(Id, H, _Graph1, Context).
 
-json_deserialize0(Context, Dict, Graph) :-
-  is_of_type(dict,Dict),
-  forall(
-    get_dict(Key, Dict, Value),
-    ( 
-      iri_key(P, Key),
-      json_deserialize0(P, Value, Graph),
-      create_property(Context, Key, Value, Graph)
-    )
-  ).
+json3([Id1|Ids], [H|T], _Graph, Context) :-
+  json3(Id1, H, _Graph1, Context),
+  json3(Ids, T, _Graph2, Context).
 
-json_deserialize0(Context, Value, _Graph) :-
-  format('~w\t=\t~w\n',[Context, Value]).
-
-json3(Dict, _Graph) :-
+json3(Id, Dict, _Graph, Context) :-
   is_of_type(dict, Dict),
-  ( get_dict('@context', Dict, Context)
-  -> true
-  ; Context = json{}
+  ( get_dict('@context', Dict, Ctx)
+  -> EffectiveContext = Ctx
+  ; EffectiveContext = Context
   ),
   ( get_dict('@id', Dict, Id)
   -> true
-  ; Id = 'TOP'),
-  Context = Context,
-  json31(Id, Dict, Output, Context),
+  ; random(Rand), 
+    Inf is Rand * 1000, 
+    Ind is float_integer_part(Inf), 
+    atom_concat(bnode, Ind, Id)
+  ),
+  json31(Id, Dict, Output, EffectiveContext),
   format('REZ:~w\n\n', [Output]).
 
 json31(Subject, Dict, Output, Context) :-
@@ -245,12 +276,10 @@ json31(Subject, Dict, Output, Context) :-
     (
       get_dict(Key, Dict, Value),
       handle_key(Predicate, _Prefix, Key),
-      ( is_dict(Value) 
-      -> random(Rand), 
-         Inf is Rand * 1000, 
-         Ind is float_integer_part(Inf), 
-         atom_concat(bnode, Ind, Object), 
-         json31(Object, Value, _, Context)
+      ( Key = '@type'
+      -> prefixed_iri(Object, _Prefix2, Value)
+      ; is_dict(Value) 
+      -> json3(Object, Value, _, Context)
       ; json31(Subject, Value, Object, Context)
       )
     ),
@@ -261,16 +290,15 @@ json31(Subject, Dict, Output, Context) :-
 
 json31(_Subject, L, Output, _) :-
   is_of_type(text, L),
-  Output = ^^(L, xsd:string).
+  Output = ^^(L, xsd:string), !.
   
 json31(_Subject, L, Output, _) :-
   is_of_type(integer, L),
-  Output = ^^(L, xsd:integer).
+  Output = ^^(L, xsd:integer), !.
 
 json31(_Subject, L, Output, _) :-
   is_of_type(float, L),
-  Output = ^^(L, xsd:double).
-
+  Output = ^^(L, xsd:double), !.
 
 printSPO([]).
 printSPO([H|[]]) :-
@@ -294,13 +322,6 @@ handle_key(_, _, Key) :-
 
 handle_key(IRI, Prefix, Key) :-
   prefixed_iri(IRI, Prefix, Key).
-
-find_type(Context, Name, Type) :-
-  iri_key(Context:Name, Type),
-  !.
-
-find_type(_, Name, Type) :-
-  iri_key(Name, Type).
 
 create_property(_, _, [], _) :- !.
 
