@@ -204,7 +204,7 @@ read_request_body(Request, GraphIn) :-
        ))
      ; throw(response(415)) % unsupported media type
      )),
-     ( memberchk(Format, [rdf, turtle, 'json-ld'])
+     ( memberchk(Format, [rdf, turtle])
      -> http_read_data(Request, Data, [to(atom)]),
         open_string(Data, Stream),
         catch((
