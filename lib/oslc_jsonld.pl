@@ -19,7 +19,12 @@ limitations under the License.
 :- use_module(library(semweb/rdf11)).
 :- use_module(library(http/json)).
 
+:- multifile rdf_db:rdf_file_type/2.
+
 rdf_db:rdf_file_type(jsonld,  jsonld).
+
+:- multifile oslc_dispatch:serializer/2,
+             oslc_dispatch:serialize_response/3.
 
 oslc_dispatch:serializer(application/'ld+json', jsonld).
 
