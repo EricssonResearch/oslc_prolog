@@ -151,7 +151,7 @@ serialize_response(Out, Graph, rdf) :- !,
   rdf_save(stream(Out), [graph(Graph)]).
 
 serialize_response(Out, Graph, turtle) :- !,
-  rdf_save_turtle(Out, [graph(Graph), comment(false), silent(true), tab_distance(0)]).
+  rdf_save_turtle(Out, [graph(Graph), comment(false), silent(true), tab_distance(4), indent(2), align_prefixes(true)]).
 
 error_message(400, 'Bad request').
 error_message(404, 'Not found').
