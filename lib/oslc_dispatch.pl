@@ -142,10 +142,10 @@ format_header(H, H2) :-
   format(atom(H2), '~w: ~w~n', [Header, Value]).
 
 serializer(application/'rdf+xml', rdf).
-serializer(application/'turtle', turtle).
+serializer(application/turtle, turtle).
 serializer(text/'rdf+xml', rdf).
 serializer(application/'x-turtle', turtle).
-serializer(text/'turtle', turtle).
+serializer(text/turtle, turtle).
 
 serialize_response(Out, Graph, rdf) :- !,
   rdf_save(stream(Out), [graph(Graph)]).

@@ -198,10 +198,8 @@ read_request_body(Request, GraphIn) :-
   ( ContentLength > 0
   -> once((
        memberchk(content_type(InContentType), Request),
-       once((
-         oslc_dispatch:serializer(Type, Format),
-         format(atom(InContentType), '~w', Type)
-       ))
+       http_header:http_parse_header_value(content_type, InContentType, media(SerializerType, _)),
+       oslc_dispatch:serializer(SerializerType, Format)
      ; throw(response(415)) % unsupported media type
      )),
      ( memberchk(Format, [rdf, turtle])
