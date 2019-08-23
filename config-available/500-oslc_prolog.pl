@@ -31,6 +31,7 @@ limitations under the License.
 
 :- use_module(library(oslc)).
 :- use_module(library(oslc_core)).
+:- use_module(library(oslc_lisp)).
 
 :- use_module(oslc_prolog(applications/oslc_prolog_server)).
 :- use_module(oslc_prolog(applications/oslc_cliopatria_ui)).
