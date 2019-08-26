@@ -28,7 +28,7 @@ lisp:func([delete, IRI, Sink], true) :- !,
   delete_resource(IRI, rdf(Sink)).
 
 lisp:func([send, IRI, URI], true) :- !,
-  post_resource(IRI, URI, []).
+  ignore(post_resource(IRI, URI, [])).
 
 lisp:func([send, IRI, URI, Graph], true) :- !,
-  post_resource(IRI, URI, [graph(Graph)]).
+  ignore(post_resource(IRI, URI, [graph(Graph)])).

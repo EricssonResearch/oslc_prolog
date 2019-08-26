@@ -47,10 +47,11 @@ rdf_graph_to_atom(Graph, Atom, ContentType) :-
 
 post_resource(IRI, URI, Options) :-
   option(graph(Graph), Options, _),
+  make_temp_graph(Tmp),
   call_cleanup((
       ( var(Graph)
-      -> copy_resource(IRI, IRI, rdf, tmp(Tmp), Options)
-      ; copy_resource(IRI, IRI, rdf(Graph), tmp(Tmp), Options)
+      -> copy_resource(IRI, IRI, rdf, rdf(Tmp), Options)
+      ; copy_resource(IRI, IRI, rdf(Graph), rdf(Tmp), Options)
       ),
       post_graph(Tmp, URI, Options)
     ),
