@@ -17,6 +17,7 @@ limitations under the License.
 :- module(oslc_lisp, []).
 
 :- use_module(library(oslc)).
+:- use_module(library(oslc_client)).
 
 :- multifile lisp:func/2.
 
@@ -25,3 +26,9 @@ lisp:func([copy, FromIRI, Source, ToIRI, Sink], true) :- !,
 
 lisp:func([delete, IRI, Sink], true) :- !,
   delete_resource(IRI, rdf(Sink)).
+
+lisp:func([send, IRI, URI], true) :- !,
+  post_resource(IRI, URI, []).
+
+lisp:func([send, IRI, URI, Graph], true) :- !,
+  post_resource(IRI, URI, [graph(Graph)]).
