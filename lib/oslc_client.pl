@@ -30,30 +30,35 @@ limitations under the License.
 :- predicate_options(post_resource/3, 3, [content_type(any), graph(atom)]).
 
 post_graph(Graph, URI, Options) :-
-  option(content_type(ContentType), Options, text/turtle),
-  rdf_graph_to_atom(Graph, Atom, ContentType),
-  http_post(URI, atom(ContentType, Atom), _, [status_code(StatusCode),
-                                              request_header('Accept'='text/turtle')
-                                             ]),
-  StatusCode == 200.
-
-rdf_graph_to_atom(Graph, Atom, ContentType) :-
   must_be(atom, Graph),
+  option(content_type(ContentType), Options, text/turtle),
   oslc_dispatch:serializer(ContentType, Serializer),
-  with_output_to(
-    atom(Atom),
-    oslc_dispatch:serialize_response(stream(current_output), Graph, Serializer)
-  ) .
+  setup_call_cleanup(
+    new_memory_file(File), (
+      open_memory_file(File, write, Out),
+      with_output_to(Out, oslc_dispatch:serialize_response(stream(current_output), Graph, Serializer)),
+      close(Out),
+      memory_file_to_atom(File, Codes),
+      debug(_, '~w', [Codes]),
+      http_post(URI, atom(ContentType, Codes), _, [status_code(StatusCode),
+                                                   request_header('Accept'='text/turtle,application/rdf+xml,application/n-triples')
+                                                  ]),
+      StatusCode == 200
+    ),
+    free_memory_file(File)
+  ).
 
 post_resource(IRI, URI, Options) :-
   option(graph(Graph), Options, _),
-  make_temp_graph(Tmp),
-  call_cleanup((
+  setup_call_catcher_cleanup(
+    make_temp_graph(Tmp),
+    (
       ( var(Graph)
       -> copy_resource(IRI, IRI, rdf, rdf(Tmp), Options)
       ; copy_resource(IRI, IRI, rdf(Graph), rdf(Tmp), Options)
       ),
       post_graph(Tmp, URI, Options)
     ),
+    _,
     delete_temp_graph(Tmp)
   ).

@@ -30,5 +30,5 @@ lisp:func([delete, IRI, Sink], true) :- !,
 lisp:func([send, IRI, URI], true) :- !,
   ignore(post_resource(IRI, URI, [])).
 
-lisp:func([send, IRI, URI, Graph], true) :- !,
-  ignore(post_resource(IRI, URI, [graph(Graph)])).
+lisp:func([send, IRI, URI, ContentType], true) :- !,
+  ignore(post_resource(IRI, URI, [content_type(ContentType)])).

@@ -147,14 +147,14 @@ format_response_graph(StatusCode, Graph, Headers, ContentType) :-
   format(atom(ContentTypeValue), '~w; charset=utf-8', [ContentType]),
   oslc_dispatch:serializer(ContentType, Serializer), % select proper serializer
   append(Headers, ['Content-type'(ContentTypeValue), 'Access-Control-Allow-Origin'('*')], InterimHeaders),
-  ( memberchk(Serializer, [rdf, turtle])
+  ( memberchk(Serializer, [xml, turtle, ntriples])
   -> graph_md5(Graph, Hash),
      append(InterimHeaders, ['ETag'(Hash)], NewHeaders)
   ; NewHeaders = InterimHeaders
   ),
   response(StatusCode, NewHeaders),
   current_output(Out),
-  oslc_dispatch:serialize_response(Out, Graph, Serializer). % serialize temporary RDF graph to the response
+  oslc_dispatch:serialize_response(stream(Out), Graph, Serializer). % serialize temporary RDF graph to the response
 
 check_path(Request, Prefix, ResourceSegments) :-
   once((
@@ -202,7 +202,7 @@ read_request_body(Request, GraphIn) :-
        oslc_dispatch:serializer(SerializerType, Format)
      ; throw(response(415)) % unsupported media type
      )),
-     ( memberchk(Format, [rdf, turtle])
+     ( memberchk(Format, [xml, turtle, ntriples])
      -> http_read_data(Request, Data, [to(atom)]),
         open_string(Data, Stream),
         catch((

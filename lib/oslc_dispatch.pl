@@ -141,17 +141,21 @@ format_header(H, H2) :-
   H =.. [Header, Value],
   format(atom(H2), '~w: ~w~n', [Header, Value]).
 
-serializer(application/'rdf+xml', rdf).
+serializer(application/'rdf+xml', xml).
 serializer(application/turtle, turtle).
-serializer(text/'rdf+xml', rdf).
 serializer(application/'x-turtle', turtle).
+serializer(text/rdf, xml).
 serializer(text/turtle, turtle).
+serializer(application/'n-triples', ntriples).
 
-serialize_response(Out, Graph, rdf) :- !,
-  rdf_save(stream(Out), [graph(Graph)]).
+serialize_response(Out, Graph, xml) :- !,
+  rdf_save(Out, [graph(Graph)]).
 
 serialize_response(Out, Graph, turtle) :- !,
   rdf_save_turtle(Out, [graph(Graph), comment(false), silent(true), tab_distance(0), indent(2), align_prefixes(true)]).
+
+serialize_response(Out, Graph, ntriples) :- !,
+  rdf_save_ntriples(Out, [graph(Graph), comment(false), silent(true)]).
 
 error_message(400, 'Bad request').
 error_message(404, 'Not found').
