@@ -14,6 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+/** <module> OSLC Prolog request dispatch handlers.
+ *
+ * Use predicates in this module to register your HTTP handlers. The =IRISpec=
+ * shall follow the pattern of =|ns:resource|=, which translates into a URI
+ * pattern of =|/ns/resource|=. The handlers are called in the descending order
+ * of priority. If the handler fails, the =output_graph= in the Context is
+ * cleared and the next handler with lower priority is called. If all of the
+ * handlers fail the default one, defined in oslc_core.pl, is used.
+ */
 :- module(oslc_dispatch, [
   oslc_get/2,
   oslc_get/3,
@@ -49,30 +58,49 @@ limitations under the License.
 
 :- dynamic handler/4.
 
+%! oslc_get(+IRISpec, +Predicate) is det
+% Register a GET handler with a default priority of 1000.
 oslc_get(IRISpec, Predicate) :-
   oslc_get(IRISpec, Predicate, 1000).
 
+%! oslc_get(+IRISpec, +Predicate, +Priority) is det
+% Register a GET handler with a given priority.
 oslc_get(IRISpec, Predicate, Priority) :-
   add_handler(get, IRISpec, Predicate, Priority).
 
+%! oslc_post(+IRISpec, +Predicate) is det
+% Register a POST handler with a default priority of 1000.
 oslc_post(IRISpec, Predicate) :-
   oslc_post(IRISpec, Predicate, 1000).
 
+%! oslc_post(+IRISpec, +Predicate, +Priority) is det
+% Register a POST handler with a given priority.
 oslc_post(IRISpec, Predicate, Priority) :-
   add_handler(post, IRISpec, Predicate, Priority).
 
+%! oslc_put(+IRISpec, +Predicate) is det
+% Register a PUT handler with a default priority of 1000.
 oslc_put(IRISpec, Predicate) :-
   oslc_put(IRISpec, Predicate, 1000).
 
+%! oslc_put(+IRISpec, +Predicate, +Priority) is det
+% Register a PUT handler with a given priority.
 oslc_put(IRISpec, Predicate, Priority) :-
   add_handler(put, IRISpec, Predicate, Priority).
 
+%! oslc_delete(+IRISpec, +Predicate) is det
+% Register a DELETE handler with a default priority of 1000.
 oslc_delete(IRISpec, Predicate) :-
   oslc_delete(IRISpec, Predicate, 1000).
 
+%! oslc_delete(+IRISpec, +Predicate, +Priority) is det
+% Register a DELETE handler with a given priority.
 oslc_delete(IRISpec, Predicate, Priority) :-
   add_handler(delete, IRISpec, Predicate, Priority).
 
+%! add_handler(+Method, ++IRISpec, ++Predicate, +Priority) is det
+% Register a predicate handler for a given HTTP method with a given priority
+% on a given URI spec.
 add_handler(Method, IRISpec, Predicate, Priority) :-
   must_be(atom, Method),
   must_be(ground, IRISpec),
@@ -81,12 +109,17 @@ add_handler(Method, IRISpec, Predicate, Priority) :-
   retractall(handler(Method, IRISpec, _, Priority)),
   assertz(handler(Method, IRISpec, Predicate, Priority)).
 
+%! delete_handler(Method, IRISpec) is semidet
+% Delete all handlers of all priorities for a given HTTP method on a given URI spec (if any).
 delete_handler(Method, IRISpec) :-
   forall(
     handler(Method, IRISpec, Handler, Priority),
     retractall(handler(Method, IRISpec, Handler, Priority))
   ).
 
+%! dispatch(+Context) is nondet
+% Dispatch an HTTP request to a matching handler with the highest priority (if any).
+% The IRI and its spec are added to the =Context= via =iri= and =iri_spec= keys.
 dispatch(Context) :-
   _{ iri_spec: Prefix:ResourceSegments,
        method: Method } :< Context,
@@ -126,9 +159,13 @@ handler_compare(<, handler(_,P1), handler(_,P2)) :-
 handler_compare(>, handler(_,P1), handler(_,P2)) :-
   P1 < P2.
 
+%! response(+StatusCode) is det
+% Generate a plain-text response with a given status code.
 response(StatusCode) :-
   format("Status: ~w~n~n", [StatusCode]).
 
+%! response(+StatusCode, +Headers) is det
+% Generate a plain-text response with a given status code and the appended =Headers=.
 response(StatusCode, Headers) :-
   format_headers(Headers, HeadersString),
   format("Status: ~w~n~w~n", [StatusCode, HeadersString]).
@@ -166,6 +203,10 @@ error_message(412, 'Precondition failed').
 error_message(415, 'Unsupported media type').
 error_message(_, 'No message').
 
+%! select_acceptable_content_type(+Request, -ContentType) is semidet
+% Select a supported content-type (=|application/rdf+xml|=, =|text/turtle|=, and =|application/n-triples|=
+% are supported as well as their non-standard variations =|text/rdf|=,
+% =|application/turtle|=, =|application/x-turtle|=) with the biggest "weight" (q-factor).
 select_acceptable_content_type(Request, ContentType) :-
   memberchk(accept(Accept), Request), % fetch accept header
   predsort(accept_compare, Accept, AcceptSorted), % sort requested content types according to qualities
