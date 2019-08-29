@@ -55,7 +55,10 @@ s_to_dict(S, C0, C, D, Graph) :-
 pos_to_dict([], C, C, D, D, _) :- !.
 pos_to_dict([P-O|T], C0, C, D0, D, Graph) :-
   convert_p(P, P1, C0, C1),
-  convert_o(O, O1, C1, C2, Graph),
+  ( P1 == '@type'
+  -> convert_resource(O, O1, C1, C2)
+  ; convert_o(O, O1, C1, C2, Graph)
+  ),
   ( O0 = D0.get(P1)
   -> ( is_list(O0)
      -> O2 = [O1|O0]
@@ -76,7 +79,8 @@ convert_o(O0, O, C0, C, Graph) :-
   rdf_is_bnode(O0), !,
   s_to_dict(O0, C0, C, O, Graph).
 convert_o(O0, O, C0, C, _) :-
-  convert_resource(O0, O, C0, C).
+  convert_resource(O0, R, C0, C),
+  O = _{'@id': R}.
 
 convert_resource(R0, R, C0, C) :-
   rdf_global_id(Prefix:Local, R0),
