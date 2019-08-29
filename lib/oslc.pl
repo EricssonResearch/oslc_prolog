@@ -58,20 +58,23 @@ limitations under the License.
 :- use_module(library(oslc_rdf)).
 :- use_module(library(oslc_error)).
 
-:- rdf_meta create_resource(r, t, t, -).
-:- rdf_meta applicable_shapes(t, -).
-:- rdf_meta create_resource(r, t, t, t, -).
-:- rdf_meta oslc_resource(r, t).
-:- rdf_meta oslc_resource(r, t, -).
-:- rdf_meta applicable_shapes(r, -, -).
-:- rdf_meta copy_resource(r, r, -, -, -).
-:- rdf_meta delete_resource(r, -).
-
-:- rdf_meta rdfType(r).
-:- rdf_meta oslcInstanceShape(r).
+:- rdf_meta create_resource(r, t, t, -),
+            applicable_shapes(t, -),
+            create_resource(r, t, t, t, -),
+            oslc_resource(r, t),
+            oslc_resource(r, t, -),
+            applicable_shapes(r, -, -),
+            copy_resource(r, r, -, -, -),
+            copy_resource1(-, -, r, -, -, -, -, -, -),
+            delete_resource(r, -),
+            rdfType(r),
+            oslcInstanceShape(r).
 
 rdfType(rdf:type).
 oslcInstanceShape(oslc:instanceShape).
+
+:- dynamic copied/1.
+:- thread_local copied/1.
 
 check_iri(NS:Local, IRI) :- !,
   must_be(atom, NS),
@@ -301,11 +304,12 @@ marshal_some_property(IRI, PropertyDefinition, Value, Type, Sink) :-
 %!  copy_resource(+IRIFrom, +IRITo, +Source, +Sink, +Options) is det.
 %
 %   Copy OSCL resource IRIFrom in Source to IRITo in Sink recursively,
-%   i.e. including all of its local resources (blank nodes). Resource
-%   IRITo existed in Sink before copying is deleted. If IRIFrom and
-%   IRITo are lists of resources of equal sizes, all resources from
-%   IRIFrom are copied to corresponding resources from IRITo. A list
-%   of Options may contain:
+%   i.e. including all of its local resources (blank nodes). If no
+%   =merge= option is specified, resource IRITo (and all recursively
+%   referred resources, if =neighbours= option is specified) existed in
+%   Sink before copying is deleted. If IRIFrom and IRITo are lists of
+%   resources of equal sizes, all resources from IRIFrom are copied to
+%   corresponding resources from IRITo. A list of Options may contain:
 %
 %    * inline(InlineSource)
 %    If specified, properties of resource IRIFrom described in a shape
@@ -336,6 +340,17 @@ marshal_some_property(IRI, PropertyDefinition, Value, Type, Sink) :-
 %      uri_ref_esc ::= /* an angle bracket-delimited URI reference
 %                      in which > and \ are \-escaped. */
 %    ==
+%
+%    * neighbours
+%    Recursively copy all refererred resources (i.e. the ones that
+%    appear as objects in the IRIFrom) residing in the Source.
+%    Reference loops are detected and resolved.
+%
+%    * merge
+%    Do not delete existing IRITo resource from Sink, i.e. merge
+%    it with the resource copied from IRIFrom. This also applies
+%    to all recursively copied referred resources if =neighbours=
+%    option is specified.
 
 copy_resource([], [], _, _, _) :- !.
 
@@ -359,7 +374,8 @@ copy_resource(IRIFrom, IRITo, Source, Sink, Options) :-
   rdf_transaction((
     applicable_shapes(IdFrom, Shapes, Source),
     create_shapes_dict(Shapes, Dict),
-    copy_resource0(IdFrom, IdTo, Dict, Source, Sink, O2)
+    copy_resource0(IdFrom, IdTo, Dict, Source, Sink, O2),
+    retractall(copied(_))
   )).
 
 parse_prefix(Prefix, Structure) :-
@@ -403,7 +419,10 @@ word_letters([]) --> [].
 letter(L) --> [L], { \+ member(L, [':','*',',','{','}']) }.
 
 copy_resource0(IRIFrom, IRITo, Dict, Source, Sink, Options) :-
-  delete_resource(IRITo, Sink),
+  ( memberchk(merge, Options)
+  -> true
+  ; delete_resource(IRITo, Sink)
+  ),
   check_resource(IRIFrom, Dict, Source),
   ( selectchk(properties(PropertyList), Options, RestOptions)
   -> true
@@ -411,26 +430,39 @@ copy_resource0(IRIFrom, IRITo, Dict, Source, Sink, Options) :-
   ),
   forall(
     unmarshal_property(IRIFrom, PropertyDefinition, Value, Type, Source)
-  , (
-    ( rdf_is_bnode(Value)
-    -> copy_bnode(Value, Source, Source, Sink, IRITo, PropertyDefinition, PropertyList, RestOptions)
-    ; ( \+ is_literal_type(Type),
-        member(inline(InlineSource), Options),
-        rdf_equal(Dict.get(PropertyDefinition).get(representation), oslc:'Inline')
-      -> copy_bnode(Value, Source, InlineSource, Sink, IRITo, PropertyDefinition, PropertyList, RestOptions)
-      ; copy_property(Value, Sink, IRITo, PropertyDefinition, Type, PropertyList)
-      )
-    )
-  )).
+  , copy_resource1(Dict, Value, Type, Source, Sink, IRITo, PropertyDefinition, PropertyList, RestOptions)
+  ).
+
+copy_resource1(_, Value, oslc:'LocalResource', Source, Sink, IRITo, PropertyDefinition, PropertyList, RestOptions) :- !,
+  copy_bnode(Value, Source, Source, Sink, IRITo, PropertyDefinition, PropertyList, RestOptions).
+
+copy_resource1(Dict, Value, oslc:'Resource', Source, Sink, IRITo, PropertyDefinition, PropertyList, RestOptions) :-
+  memberchk(inline(InlineSource), RestOptions),
+  rdf_equal(Dict.get(PropertyDefinition).get(representation), oslc:'Inline'), !,
+  copy_bnode(Value, Source, InlineSource, Sink, IRITo, PropertyDefinition, PropertyList, RestOptions).
+
+copy_resource1(_, Value, oslc:'Resource', Source, Sink, IRITo, PropertyDefinition, _, RestOptions) :-
+  memberchk(neighbours, RestOptions),
+  once(unmarshal_property(Value, _, _, _, Source)), !,
+  ( copied(Value)
+  -> true
+  ; applicable_shapes(Value, ResourceShapes, Source),
+    create_shapes_dict(ResourceShapes, ResourceDict),
+    copy_resource0(Value, Value, ResourceDict, Source, Sink, RestOptions),
+    assertz(copied(Value))
+  ),
+  marshal_property(IRITo, PropertyDefinition, Value, _, Sink).
+
+copy_resource1(_, Value, Type, _, Sink, IRITo, PropertyDefinition, PropertyList, _) :-
+  copy_property(Value, Sink, IRITo, PropertyDefinition, Type, PropertyList).
 
 copy_bnode(Value, ShapeSource, Source, Sink, IRITo, Property, PropertyList, RestOptions) :-
   ( ( var(PropertyList),
       NewOptions = RestOptions
-    ; once((
-        member('*'(SubList), PropertyList)
-      ; P =.. [Property, SubList],
-        member(P, PropertyList)
-      )),
+    ; ( P =.. [Property, SubList],
+        memberchk(P, PropertyList)
+      ; memberchk('*'(SubList), PropertyList)
+      ),
       NewOptions = [properties(SubList)|RestOptions]
     )
   -> rdf_create_bnode(Bnode),
@@ -444,8 +476,8 @@ copy_bnode(Value, ShapeSource, Source, Sink, IRITo, Property, PropertyList, Rest
 copy_property(Value, Sink, IRITo, Property, Type, PropertyList) :-
   ( ( var(PropertyList)
     ; once((
-        member('*', PropertyList)
-      ; member(Property, PropertyList)
+        memberchk(Property, PropertyList)
+      ; memberchk('*', PropertyList)
       ))
     )
   -> marshal_property(IRITo, Property, Value, Type, Sink)

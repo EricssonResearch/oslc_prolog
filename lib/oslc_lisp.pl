@@ -24,11 +24,14 @@ limitations under the License.
 lisp:func([copy, FromIRI, Source, ToIRI, Sink], true) :- !,
   copy_resource(FromIRI, ToIRI, rdf(Source), rdf(Sink), []).
 
+lisp:func([copy, FromIRI, Source, ToIRI, Sink, Options], true) :- !,
+  copy_resource(FromIRI, ToIRI, rdf(Source), rdf(Sink), Options).
+
 lisp:func([delete, IRI, Sink], true) :- !,
   delete_resource(IRI, rdf(Sink)).
 
 lisp:func([send, IRI, URI], true) :- !,
   ignore(post_resource(IRI, URI, [])).
 
-lisp:func([send, IRI, URI, ContentType], true) :- !,
-  ignore(post_resource(IRI, URI, [content_type(ContentType)])).
+lisp:func([send, IRI, URI, Options], true) :- !,
+  ignore(post_resource(IRI, URI, Options)).

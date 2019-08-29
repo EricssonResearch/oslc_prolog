@@ -198,7 +198,7 @@ literal_types([ rdf:'XMLLiteral',
 
 is_literal_type(Type) :-
   literal_types(LT),
-  member(Type, LT).
+  memberchk(Type, LT).
 
 % ------------ VALUE UNMARSHALLING
 
