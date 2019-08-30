@@ -78,7 +78,7 @@ dispatcher(Request) :-
       ; once((
           E = error(Error, context(prolog_stack(Backtrace), _)),
           with_output_to(string(S0), print_prolog_backtrace(current_output, Backtrace, [])),
-          format(string(S), '~w:~w', [Error, S0])
+          format(string(S), '~w:~n~w', [Error, S0])
         ; message_to_string(error(E, _), S)
         )),
         format_error_response(Request, 500, S) % internal server error

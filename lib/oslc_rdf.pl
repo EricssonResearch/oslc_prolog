@@ -33,6 +33,10 @@ limitations under the License.
 
 :- thread_local temp_graph/1.
 
+:- multifile marshal_property/5,
+             unmarshal_property/5,
+             delete_property/3.
+
 % ------------ RDF SOURCE / SINK
 
 oslc:marshal_property(IRI, PropertyDefinition, Value, Type, rdf(Graph)) :-
