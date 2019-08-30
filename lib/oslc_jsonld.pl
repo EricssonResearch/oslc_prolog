@@ -28,7 +28,7 @@ rdf_db:rdf_file_type(jsonld,  jsonld).
 
 oslc_dispatch:serializer(application/'ld+json', jsonld).
 
-oslc_dispatch:serialize_response(Out, Graph, jsonld) :-
+oslc_dispatch:serialize_response(stream(Out), Graph, jsonld) :-
   rdf_graph(Graph),
   findall(S, (
     rdf(S, _, _, Graph),
