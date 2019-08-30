@@ -23,6 +23,7 @@ limitations under the License.
   applicable_shapes/3,
   copy_resource/5,
   delete_resource/2,
+  delete_resource/3,
   unmarshal_property/5,
   marshal_property/5,
   unmarshal_list_property/5,
@@ -73,8 +74,8 @@ limitations under the License.
 rdfType(rdf:type).
 oslcInstanceShape(oslc:instanceShape).
 
-:- dynamic copied/1.
-:- thread_local copied/1.
+:- dynamic copied/1, deleted/1.
+:- thread_local copied/1, deleted/1.
 
 check_iri(NS:Local, IRI) :- !,
   must_be(atom, NS),
@@ -371,12 +372,15 @@ copy_resource(IRIFrom, IRITo, Source, Sink, Options) :-
      O2 = [properties(PropertyList)|RestOptions2]
   ; O2 = O1
   ),
-  rdf_transaction((
-    applicable_shapes(IdFrom, Shapes, Source),
-    create_shapes_dict(Shapes, Dict),
-    copy_resource0(IdFrom, IdTo, Dict, Source, Sink, O2),
-    retractall(copied(_))
-  )).
+  rdf_transaction(
+    call_cleanup((
+      applicable_shapes(IdFrom, Shapes, Source),
+      create_shapes_dict(Shapes, Dict),
+      copy_resource0(IdFrom, IdTo, Dict, Source, Sink, O2)
+    ),
+      retractall(copied(_))
+    )
+  ).
 
 parse_prefix(Prefix, Structure) :-
   atom_chars(Prefix, CPrefix),
@@ -486,20 +490,45 @@ copy_property(Value, Sink, IRITo, Property, Type, PropertyList) :-
 
 %!  delete_resource(+IRI, +Sink) is det.
 %
-%   Delete OSCL resource IRI from Sink recursively, i.e. including all
-%   of its local resources (blank nodes).
+%   Equivalent to =|delete_resource(IRI, Sink, [])|=.
 
 delete_resource(IRI, Sink) :-
   check_iri(IRI, Id),
-  rdf_transaction((
-    ignore(delete_resource0(Id, Sink))
-  )).
+  rdf_transaction(
+    ignore(delete_resource0(Id, Sink, []))
+  ).
 
-delete_resource0(IRI, Sink) :-
-  forall((
-    unmarshal_property(IRI, _, Value, _, Sink),
-    rdf_is_bnode(Value)
+%!  delete_resource(+IRI, +Sink, +Options) is det.
+%
+%   Delete OSCL resource IRI from Sink recursively, i.e. including all
+%   of its local resources (blank nodes). If option =neighbours= is
+%   specified, recursively removes all referred resources from Sink.
+%   A list of Options may contain:
+%
+%    * neighbours
+%    Recursively delete all refererred resources (i.e. the ones that
+%    appear as objects in IRI) residing in the Sink.
+
+delete_resource(IRI, Sink, Options) :-
+  check_iri(IRI, Id),
+  rdf_transaction(
+    ignore(delete_resource0(Id, Sink, Options))
+  ).
+
+delete_resource0(IRI, Sink, Options) :-
+  call_cleanup((
+    forall((
+      unmarshal_property(IRI, _, Value, Type, Sink),
+      ( rdf_equal(oslc:'LocalResource', Type)
+      ; memberchk(neighbours, Options),
+        rdf_equal(oslc:'Resource', Type)
+      ),
+      \+ deleted(Value)
+    ), (
+      delete_resource0(Value, Sink, Options),
+      assertz(deleted(Value))
+    ))
   ),
-    delete_resource0(Value, Sink)
+    retractall(deleted(_))
   ),
   delete_property(IRI, _, Sink).

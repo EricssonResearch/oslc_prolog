@@ -39,7 +39,6 @@ post_graph(Graph, URI, Options) :-
       with_output_to(Out, oslc_dispatch:serialize_response(stream(current_output), Graph, Serializer)),
       close(Out),
       memory_file_to_atom(File, Codes),
-      debug(_, '~w', [Codes]),
       http_post(URI, atom(ContentType, Codes), _, [status_code(StatusCode),
                                                    request_header('Accept'='text/turtle,application/rdf+xml,application/n-triples')
                                                   ]),
