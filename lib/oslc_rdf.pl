@@ -16,6 +16,7 @@ limitations under the License.
 
 :- module(oslc_rdf, [
   make_temp_graph/1,
+  delete_temp_graph/1,
   clean_temp_graphs/0,
   autodetect_resource_graph/2,
   resource_md5/3,
@@ -96,6 +97,16 @@ make_temp_graph(Graph) :-
   rdf_create_graph(Graph),
   rdf_persistency(Graph, false),
   assertz(temp_graph(Graph)).
+
+%!  delete_temp_graph(+Graph) is det.
+%
+%   Deletes temporary graph created with make_temp_graph.
+
+delete_temp_graph(Graph) :-
+  must_be(atom, Graph),
+  temp_graph(Graph),
+  rdf_unload_graph(Graph),
+  retractall(temp_graph(Graph)).
 
 %!  clean_temp_graphs is det.
 %

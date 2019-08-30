@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 :- module(oslc_core, [
-  post_resource/2
+  handle_post_resource/2
 ]).
 
 :- use_module(library(semweb/rdf11)).
@@ -118,9 +118,9 @@ handle_get(Context) :-
   ).
 
 handle_post(Context) :-
-  post_resource(Context, rdf(user)).
+  handle_post_resource(Context, rdf(user)).
 
-post_resource(Context, Sink) :-
+handle_post_resource(Context, Sink) :-
   catch((
       setting(oslc_prolog_server:prefix_path, PrefixPath),
       memberchk(protocol(Protocol), Context.request),
@@ -133,7 +133,7 @@ post_resource(Context, Sink) :-
       -> Authority = Host
       ; format(atom(Authority), '~w:~w', [Host, Port])
       ),
-      post_resource0(Context.iri, rdf(Context.graph_in), Sink, NewResource),
+      handle_post_resource0(Context.iri, rdf(Context.graph_in), Sink, NewResource),
       rdf_global_id(Prefix:Name, NewResource),
       format(atom(NewPath), '~w~w/~w', [PrefixPath, Prefix, Name]),
       uri_components(Location, uri_components(Protocol, Authority, NewPath, _, _)),
@@ -143,7 +143,7 @@ post_resource(Context, Sink) :-
     throw(response(400, Message)) % bad request
   ).
 
-post_resource0(IRI, Source, Sink, NewResource) :-
+handle_post_resource0(IRI, Source, Sink, NewResource) :-
   once((
     rdf(IRI, rdf:type, oslc:'CreationFactory')
   ; oslc_error('Resource [~w] is not a creation factory', [IRI])
