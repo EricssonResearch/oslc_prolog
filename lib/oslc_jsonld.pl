@@ -54,24 +54,22 @@ s_to_dict(S, C0, C, D, Graph) :-
 
 pos_to_dict([], C, C, D, D, _) :- !.
 pos_to_dict([P-O|T], C0, C, D0, D, Graph) :-
-  convert_p(P, P1, C0, C1),
-  ( P1 == '@type'
-  -> convert_resource(O, O1, C1, C2)
-  ; convert_o(O, O1, C1, C2, Graph)
-  ),
+  convert_po(P, P1, O, O1, C0, C1, Graph),
   ( O0 = D0.get(P1)
   -> ( is_list(O0)
      -> O2 = [O1|O0]
-     ; O2 = [O0]
+     ; O2 = [O1,O0]
      )
   ; O2 = O1
   ),
   D1 = D0.put(P1, O2),
-  pos_to_dict(T, C2, C, D1, D, Graph).
+  pos_to_dict(T, C1, C, D1, D, Graph).
 
-convert_p('http://www.w3.org/1999/02/22-rdf-syntax-ns#type', '@type', C, C) :- !.
-convert_p(P0, P, C0, C) :-
-  convert_resource(P0, P, C0, C).
+convert_po('http://www.w3.org/1999/02/22-rdf-syntax-ns#type', '@type', O0, O, C0, C, _) :- !,
+  convert_resource(O0, O, C0, C).
+convert_po(P0, P, O0, O, C0, C, Graph) :-
+  convert_resource(P0, P, C0, C1),
+  convert_o(O0, O, C1, C, Graph).
 
 convert_o(^^(O, _), O, C, C, _) :- !.
 convert_o(@(O, _), O, C, C, _) :- !.
