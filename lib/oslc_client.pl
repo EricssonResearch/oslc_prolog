@@ -36,12 +36,12 @@ post_graph(Graph, URI, Options) :-
   setup_call_cleanup(
     new_memory_file(File), (
       open_memory_file(File, write, Out),
-      with_output_to(Out, oslc_dispatch:serialize_response(stream(current_output), Graph, Serializer)),
+      oslc_dispatch:serialize_response(stream(Out), Graph, Serializer),
       close(Out),
-      memory_file_to_atom(File, Codes),
-      http_post(URI, atom(ContentType, Codes), _, [status_code(StatusCode),
-                                                   request_header('Accept'='text/turtle,application/rdf+xml,application/n-triples')
-                                                  ]),
+      http_post(URI, memory_file(ContentType, File), _,
+                [ status_code(StatusCode),
+                  request_header('Accept'='text/turtle,application/rdf+xml,application/n-triples')
+                ]),
       StatusCode == 200
     ),
     free_memory_file(File)
