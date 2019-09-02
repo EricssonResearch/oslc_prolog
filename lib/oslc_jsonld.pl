@@ -86,3 +86,94 @@ convert_resource(R0, R, C0, C) :-
   format(atom(R), '~w:~w', [Prefix, Local]),
   C = C0.put(Prefix, PrefixIRI).
 convert_resource(R, R, C, C).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Loading json-ld
+
+% Register parser
+
+:- multifile
+    rdf_db:rdf_load_stream/3,
+    rdf_db:rdf_file_type/2.
+
+:- predicate_options(load_json_stream/3, 2, [register_namespaces(boolean), prefixes(-list), graph(atom)]).
+
+% Register parser
+rdf_db:rdf_load_stream(jsonld, Stream, Options) :-
+  rdf_db:graph(Options, Graph),
+  ( var(Graph) -> Graph = user ; true ),
+  rdf_transaction((
+    load_json_stream(stream(Stream), Options, Graph),
+    rdf_set_graph(Graph, modified(false))
+  ),
+  loading_graph(Graph)).
+
+rdf_db:rdf_file_type(jsonld,  jsonld).
+
+load_json_stream(stream(Stream), _M:Options, Graph) :-
+  option(register_namespaces(RegisterNS), Options, false),
+  option(prefixes(Prefixes), Options, _),
+  rdf_graph(Graph),
+  json_read_dict(Stream, Json),
+  json_deserialize(Json, Graph, Prefixes),
+  ( RegisterNS -> maplist(register_prefix, Prefixes) ; true ).
+
+register_prefix(Prefix-URI) :-
+  rdf_register_prefix(Prefix, URI, keep(true)).
+
+% Deserialization
+context_to_iri(PKey, IRI, Ctx) :-
+  sub_string(PKey, NP, _, NL, ":"),
+  sub_string(PKey, 0, NP, _, Prefix),
+  sub_string(PKey, _, NL, 0, Local),
+  atom_string(Key, Prefix),
+  NS = Ctx.get(Key), !,
+  atom_concat(NS, Local, IRI),
+  rdf_iri(IRI).
+
+context_to_iri(String, IRI, _) :- string(String), !, atom_string(IRI, String).
+context_to_iri(IRI, IRI, _) :- atom(IRI).
+
+json_deserialize(Dict, Graph, Prefixes) :-
+  is_of_type(dict, Dict),
+  ( Ctx = Dict.get('@context') -> true ; Ctx = _{} ),
+  dict_to_res(Graph, Dict, _, Ctx),
+  dict_pairs(Ctx, _, Prefixes).
+
+dict_to_res(Graph, Dict, S, Ctx) :-
+  ( Id = Dict.get('@id') 
+  -> context_to_iri(Id, S, Ctx)
+  ;  rdf_create_bnode(S)
+  ),
+  findall(K-V, get_dict(K, Dict, V), KVs),
+  kvs_to_po(Graph, S, KVs, Ctx).
+
+kvs_to_po(_, _, [], _) :- !.
+
+kvs_to_po(Graph, S, [K-V|T], Ctx) :- 
+  kv_to_po(Graph, Ctx, S, K, V),
+  kvs_to_po(Graph, S, T, Ctx).
+
+kv_to_po(Graph, Ctx, S, K, V) :-
+  is_list(V), !,
+  maplist(kv_to_po(Graph, Ctx, S, K), V).
+
+kv_to_po(_, _, _, '@id', _) :- !.
+
+kv_to_po(_, _, _, '@context', _) :- !.
+
+kv_to_po(Graph, Ctx, S, '@type', V) :-
+  context_to_iri(V, Type, Ctx),
+  rdf_assert(S, 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type', Type, Graph), !.
+
+kv_to_po(Graph, Ctx, S, K, V) :-
+  is_dict(V), !,
+  context_to_iri(K, P, Ctx),
+  dict_to_res(Graph, V, O, Ctx),
+  rdf_assert(S, P, O, Graph).
+
+kv_to_po(Graph, Ctx, S, K, V) :-
+  context_to_iri(K, P, Ctx),
+  % We have a value, should be processed more elaborately
+  V = O, 
+  rdf_assert(S, P, O, Graph).
