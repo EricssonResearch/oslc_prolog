@@ -30,8 +30,11 @@ lisp:func([copy, FromIRI, Source, ToIRI, Sink, Options], true) :- !,
 lisp:func([delete, IRI, Sink], true) :- !,
   delete_resource(IRI, rdf(Sink)).
 
-lisp:func([send, IRI, URI], true) :- !,
-  ignore(post_resource(IRI, URI, [])).
+lisp:func([delete, IRI, Sink, Options], true) :- !,
+  delete_resource(IRI, rdf(Sink), Options).
 
-lisp:func([send, IRI, URI, Options], true) :- !,
-  ignore(post_resource(IRI, URI, Options)).
+lisp:func([send, IRI, URI], Result) :- !,
+  lisp:result(oslc_client:post_resource(IRI, URI, []), Result).
+
+lisp:func([send, IRI, URI, Options], Result) :- !,
+  lisp:result(oslc_client:post_resource(IRI, URI, Options), Result).
