@@ -19,12 +19,14 @@ limitations under the License.
 :- use_module(library(semweb/rdf11)).
 :- use_module(library(http/json)).
 
-:- multifile rdf_db:rdf_file_type/2.
+:- multifile oslc_dispatch:serializer/2,
+             oslc_dispatch:serialize_response/3,
+             rdf_db:rdf_load_stream/3,
+             rdf_db:rdf_file_type/2.
+
+:- rdf_meta convert_po(r,-,-,-,-,-,-).
 
 rdf_db:rdf_file_type(jsonld,  jsonld).
-
-:- multifile oslc_dispatch:serializer/2,
-             oslc_dispatch:serialize_response/3.
 
 oslc_dispatch:serializer(application/'ld+json', jsonld).
 
@@ -65,7 +67,7 @@ pos_to_dict([P-O|T], C0, C, D0, D, Graph) :-
   D1 = D0.put(P1, O2),
   pos_to_dict(T, C1, C, D1, D, Graph).
 
-convert_po('http://www.w3.org/1999/02/22-rdf-syntax-ns#type', '@type', O0, O, C0, C, _) :- !,
+convert_po(rdf:type, '@type', O0, O, C0, C, _) :- !,
   convert_resource(O0, O, C0, C).
 convert_po(P0, P, O0, O, C0, C, Graph) :-
   convert_resource(P0, P, C0, C1),
@@ -87,70 +89,76 @@ convert_resource(R0, R, C0, C) :-
   C = C0.put(Prefix, PrefixIRI).
 convert_resource(R, R, C, C).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Loading json-ld
 
-% Register parser
-
-:- multifile
-    rdf_db:rdf_load_stream/3,
-    rdf_db:rdf_file_type/2.
-
-:- predicate_options(load_json_stream/3, 2, [register_namespaces(boolean), prefixes(-list), graph(atom)]).
-
-% Register parser
-rdf_db:rdf_load_stream(jsonld, Stream, Options) :-
-  rdf_db:graph(Options, Graph),
-  ( var(Graph) -> Graph = user ; true ),
-  rdf_transaction((
-    load_json_stream(stream(Stream), Options, Graph),
-    rdf_set_graph(Graph, modified(false))
+rdf_db:rdf_load_stream(jsonld, Stream, Options0) :-
+  rdf_db:graph(Options0, Graph),
+  ( var(Graph)
+  -> rdf_default_graph(Graph)
+  ; true
   ),
-  loading_graph(Graph)).
-
-rdf_db:rdf_file_type(jsonld,  jsonld).
-
-load_json_stream(stream(Stream), _M:Options, Graph) :-
+  strip_module(Options0, _, Options),
   option(register_namespaces(RegisterNS), Options, false),
   option(prefixes(Prefixes), Options, _),
   rdf_graph(Graph),
   json_read_dict(Stream, Json),
-  json_deserialize(Json, Graph, Prefixes),
-  ( RegisterNS -> maplist(register_prefix, Prefixes) ; true ).
+  rdf_transaction((
+    json_deserialize(Graph, Json, Prefixes),
+    ( RegisterNS == true
+    -> maplist(register_prefix, Prefixes)
+    ; true
+    ),
+    rdf_set_graph(Graph, modified(false))
+  ), parse(Graph)).
 
 register_prefix(Prefix-URI) :-
   rdf_register_prefix(Prefix, URI, keep(true)).
 
-% Deserialization
 context_to_iri(PKey, IRI, Ctx) :-
-  sub_string(PKey, NP, _, NL, ":"),
+  sub_string(PKey, NP, 1, NL, ":"),
   sub_string(PKey, 0, NP, _, Prefix),
   sub_string(PKey, _, NL, 0, Local),
   atom_string(Key, Prefix),
   NS = Ctx.get(Key), !,
-  atom_concat(NS, Local, IRI),
-  rdf_iri(IRI).
+  atom_concat(NS, Local, IRI).
 
-context_to_iri(String, IRI, _) :- string(String), !, atom_string(IRI, String).
-context_to_iri(IRI, IRI, _) :- atom(IRI).
+context_to_iri(String, IRI, _) :-
+  atom_string(IRI, String).
 
-json_deserialize(Dict, Graph, Prefixes) :-
-  is_of_type(dict, Dict),
-  ( Ctx = Dict.get('@context') -> true ; Ctx = _{} ),
+json_deserialize(Graph, List, Prefixes) :-
+  is_list(List), !,
+  maplist(json_deserialize(Graph), List, PrefixesList),
+  merge_dicts(PrefixesList, [], Prefixes).
+
+json_deserialize(Graph, Dict, Prefixes) :-
+  is_dict(Dict),
+  ( Ctx = Dict.get('@context')
+  -> true
+  ; Ctx = _{}
+  ),
   dict_to_res(Graph, Dict, _, Ctx),
   dict_pairs(Ctx, _, Prefixes).
 
+merge_dicts([], P, P) :- !.
+merge_dicts([H|T], D, MP) :-
+  findall(K-V, (
+    member(K-V, H),
+    \+ member(K-V, D)
+  ), New),
+  append(D, New, ND),
+  merge_dicts(T, ND, MP).
+
 dict_to_res(Graph, Dict, S, Ctx) :-
-  ( Id = Dict.get('@id') 
+  ( Id = Dict.get('@id')
   -> context_to_iri(Id, S, Ctx)
-  ;  rdf_create_bnode(S)
+  ; rdf_create_bnode(S)
   ),
-  findall(K-V, get_dict(K, Dict, V), KVs),
+  dict_pairs(Dict, _, KVs),
   kvs_to_po(Graph, S, KVs, Ctx).
 
 kvs_to_po(_, _, [], _) :- !.
 
-kvs_to_po(Graph, S, [K-V|T], Ctx) :- 
+kvs_to_po(Graph, S, [K-V|T], Ctx) :-
   kv_to_po(Graph, Ctx, S, K, V),
   kvs_to_po(Graph, S, T, Ctx).
 
@@ -162,9 +170,9 @@ kv_to_po(_, _, _, '@id', _) :- !.
 
 kv_to_po(_, _, _, '@context', _) :- !.
 
-kv_to_po(Graph, Ctx, S, '@type', V) :-
+kv_to_po(Graph, Ctx, S, '@type', V) :- !,
   context_to_iri(V, Type, Ctx),
-  rdf_assert(S, 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type', Type, Graph), !.
+  rdf_assert(S, rdf:type, Type, Graph).
 
 kv_to_po(Graph, Ctx, S, K, V) :-
   is_dict(V), !,
@@ -172,8 +180,7 @@ kv_to_po(Graph, Ctx, S, K, V) :-
   dict_to_res(Graph, V, O, Ctx),
   rdf_assert(S, P, O, Graph).
 
-kv_to_po(Graph, Ctx, S, K, V) :-
+kv_to_po(Graph, Ctx, S, K, O) :-
   context_to_iri(K, P, Ctx),
   % We have a value, should be processed more elaborately
-  V = O, 
   rdf_assert(S, P, O, Graph).
