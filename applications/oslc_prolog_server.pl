@@ -202,7 +202,7 @@ read_request_body(Request, GraphIn) :-
        oslc_dispatch:serializer(SerializerType, Format)
      ; throw(response(415)) % unsupported media type
      )),
-     ( memberchk(Format, [xml, turtle, ntriples])
+     ( memberchk(Format, [xml, turtle, ntriples, jsonld])
      -> http_read_data(Request, Data, [to(atom)]),
         open_string(Data, Stream),
         catch((
