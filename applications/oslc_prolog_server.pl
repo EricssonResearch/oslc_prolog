@@ -146,12 +146,8 @@ format_response_graph(StatusCode, Graph, Headers, ContentType) :-
   must_be(ground, ContentType),
   format(atom(ContentTypeValue), '~w; charset=utf-8', [ContentType]),
   oslc_dispatch:serializer(ContentType, Serializer), % select proper serializer
-  append(Headers, ['Content-type'(ContentTypeValue), 'Access-Control-Allow-Origin'('*')], InterimHeaders),
-  ( memberchk(Serializer, [xml, turtle, ntriples])
-  -> graph_md5(Graph, Hash),
-     append(InterimHeaders, ['ETag'(Hash)], NewHeaders)
-  ; NewHeaders = InterimHeaders
-  ),
+  graph_md5(Graph, Hash),
+  append(Headers, ['Content-type'(ContentTypeValue), 'ETag'(Hash), 'Access-Control-Allow-Origin'('*')], NewHeaders),
   response(StatusCode, NewHeaders),
   current_output(Out),
   oslc_dispatch:serialize_response(stream(Out), Graph, Serializer). % serialize temporary RDF graph to the response
@@ -195,27 +191,34 @@ read_request_body(Request, GraphIn) :-
     memberchk(content_length(ContentLength), Request)
   ; throw(response(411)) % content length required
   )),
-  ( ContentLength > 0
-  -> once((
-       memberchk(content_type(InContentType), Request),
-       http_header:http_parse_header_value(content_type, InContentType, media(SerializerType, _)),
-       oslc_dispatch:serializer(SerializerType, Format)
-     ; throw(response(415)) % unsupported media type
-     )),
-     ( memberchk(Format, [xml, turtle, ntriples, jsonld])
-     -> http_read_data(Request, Data, [to(atom)]),
-        open_string(Data, Stream),
-        catch((
+  ContentLength > 0,
+  once((
+    memberchk(content_type(InContentType), Request),
+    http_header:http_parse_header_value(content_type, InContentType, media(SerializerType, _)),
+    oslc_dispatch:serializer(SerializerType, Format)
+  ; throw(response(415)) % unsupported media type
+  )),
+  memberchk(input(In), Request),
+  setup_call_cleanup(
+    new_memory_file(MemFile),
+    ( setup_call_cleanup(
+        open_memory_file(MemFile, write, WriteStream, [encoding(octet)]),
+        copy_stream_data(In, WriteStream, ContentLength),
+        close(WriteStream)
+      ),
+      open_memory_file(MemFile, read, Stream, [encoding(utf8)]),
+      catch((
           make_temp_graph(GraphIn),
           rdf_load(stream(Stream), [graph(GraphIn), format(Format), silent(true), on_error(error), cache(false)])
         ),
-          error(E, stream(Stream, Line, Column, _)),
+        error(E, stream(Stream, Line, Column, _)),
         (
           message_to_string(error(E, _), S),
           format(atom(Message), 'Parsing error (line ~w, column ~w): ~w.', [Line, Column, S]),
           throw(response(400, Message)) % bad request
-        ))
-     ; true
-     )
-  ; true
+        )
+      )
+    ),
+    free_memory_file(MemFile)
   ).
+read_request_body(_, _).
