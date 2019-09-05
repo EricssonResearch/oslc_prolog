@@ -423,6 +423,10 @@ word_letters([]) --> [].
 letter(L) --> [L], { \+ member(L, [':','*',',','{','}']) }.
 
 copy_resource0(IRIFrom, IRITo, Dict, Source, Sink, Options) :-
+  ( memberchk(neighbours, Options)
+  -> assertz(copied(IRIFrom))
+  ; true
+  ),
   ( memberchk(merge, Options)
   -> true
   ; delete_resource(IRITo, Sink)
@@ -452,8 +456,7 @@ copy_resource1(_, Value, oslc:'Resource', Source, Sink, IRITo, PropertyDefinitio
   -> true
   ; applicable_shapes(Value, ResourceShapes, Source),
     create_shapes_dict(ResourceShapes, ResourceDict),
-    copy_resource0(Value, Value, ResourceDict, Source, Sink, RestOptions),
-    assertz(copied(Value))
+    copy_resource0(Value, Value, ResourceDict, Source, Sink, RestOptions)
   ),
   marshal_property(IRITo, PropertyDefinition, Value, _, Sink).
 
