@@ -16,6 +16,7 @@ limitations under the License.
 
 :- module(oslc_rdf, [
   make_temp_graph/1,
+  pass_temp_graph/2,
   delete_temp_graph/1,
   clean_temp_graphs/0,
   autodetect_resource_graph/2,
@@ -30,6 +31,8 @@ limitations under the License.
 
 :- rdf_meta autodetect_resource_graph(r, -).
 :- rdf_meta resource_md5(r, -, -).
+
+:- dynamic temp_graph/1.
 
 :- thread_local temp_graph/1.
 
@@ -97,6 +100,22 @@ make_temp_graph(Graph) :-
   rdf_create_graph(Graph),
   rdf_persistency(Graph, false),
   assertz(temp_graph(Graph)).
+
+%!  pass_temp_graph(+Graph, +ThreadId) is det.
+%
+%   Remove temporary graph Graph registration from current thread
+%   and register it in thread ThreadId. Current thread will not
+%   remove this graph if delete_temp_graph or clean_temp_graphs
+%   is called. Thread ThreadId becomes responsible for handling
+%   temporary graph Graph and its cleanup. Fails silently if
+%   current thread does not have temporary graph Graph.
+
+pass_temp_graph(Graph, ThreadId) :-
+  must_be(atom, Graph),
+  ( temp_graph(Graph)
+  -> retractall(temp_graph(Graph)),
+     thread_signal(ThreadId, assertz(temp_graph(Graph)))
+  ).
 
 %!  delete_temp_graph(+Graph) is det.
 %
