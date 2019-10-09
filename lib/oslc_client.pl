@@ -23,8 +23,7 @@ limitations under the License.
 :- use_module(library(oslc)).
 :- use_module(library(oslc_rdf)).
 
-:- rdf_meta post_resource(r, -),
-            post_resource(r, -, -).
+:- rdf_meta post_resource(r, -, -).
 
 :- predicate_options(post_graph/3, 3, [content_type(any)]).
 :- predicate_options(post_resource/3, 3, [content_type(any), graph(atom)]).
