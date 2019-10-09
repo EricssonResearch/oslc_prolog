@@ -38,3 +38,13 @@ lisp:func([send, IRI, URI], Result) :- !,
 
 lisp:func([send, IRI, URI, Options], Result) :- !,
   lisp:result(oslc_client:post_resource(IRI, URI, Options), Result).
+
+lisp:func([send_receive, IRI, URI, GraphOut], Result) :- !,
+  marker,
+  lisp:result(oslc_client:post_resource(IRI, URI, [], GraphOut), Result).
+
+lisp:func([send_receive, IRI, URI, GraphOut, Options], Result) :- !,
+  marker,
+  lisp:result(oslc_client:post_resource(IRI, URI, Options, GraphOut), Result).
+
+marker.
