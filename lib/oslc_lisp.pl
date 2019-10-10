@@ -21,17 +21,17 @@ limitations under the License.
 
 :- multifile lisp:func/2.
 
-lisp:func([copy, FromIRI, Source, ToIRI, Sink], true) :- !,
-  copy_resource(FromIRI, ToIRI, rdf(Source), rdf(Sink), []).
+lisp:func([copy, FromIRI, Source, ToIRI, Sink], Result) :- !,
+  lisp:result(oslc:copy_resource(FromIRI, ToIRI, rdf(Source), rdf(Sink), []), Result).
 
-lisp:func([copy, FromIRI, Source, ToIRI, Sink, Options], true) :- !,
-  copy_resource(FromIRI, ToIRI, rdf(Source), rdf(Sink), Options).
+lisp:func([copy, FromIRI, Source, ToIRI, Sink, Options], Result) :- !,
+  lisp:result(oslc:copy_resource(FromIRI, ToIRI, rdf(Source), rdf(Sink), Options), Result).
 
-lisp:func([delete, IRI, Sink], true) :- !,
-  delete_resource(IRI, rdf(Sink)).
+lisp:func([delete, IRI, Sink], Result) :- !,
+  lisp:result(oslc:delete_resource(IRI, rdf(Sink)), Result).
 
-lisp:func([delete, IRI, Sink, Options], true) :- !,
-  delete_resource(IRI, rdf(Sink), Options).
+lisp:func([delete, IRI, Sink, Options], Result) :- !,
+  lisp:result(oslc:delete_resource(IRI, rdf(Sink), Options), Result).
 
 lisp:func([send, IRI, URI], Result) :- !,
   lisp:result(oslc_client:post_resource(IRI, URI, []), Result).
