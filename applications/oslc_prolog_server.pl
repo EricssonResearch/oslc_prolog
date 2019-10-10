@@ -19,6 +19,7 @@ limitations under the License.
 :- use_module(library(semweb/rdf11)).
 :- use_module(library(http/thread_httpd)).
 :- use_module(library(http/http_client)).
+:- use_module(library(http/http_header)).
 :- use_module(library(http/http_dispatch)).
 :- use_module(library(broadcast)).
 :- use_module(library(oslc_dispatch)).
@@ -194,7 +195,7 @@ read_request_body(Request, GraphIn) :-
   ContentLength > 0,
   once((
     memberchk(content_type(InContentType), Request),
-    http_header:http_parse_header_value(content_type, InContentType, media(SerializerType, _)),
+    http_parse_header_value(content_type, InContentType, media(SerializerType, _)),
     oslc_dispatch:serializer(SerializerType, Format)
   ; throw(response(415)) % unsupported media type
   )),
