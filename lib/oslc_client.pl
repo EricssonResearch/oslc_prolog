@@ -26,8 +26,8 @@ limitations under the License.
 
 :- rdf_meta post_resource(r, -, -).
 
-:- predicate_options(post_graph/3, 3, [content_type(any), headers(any), to(any)]).
-:- predicate_options(post_resource/3, 3, [content_type(any), graph(atom), response_graph(atom)]).
+:- predicate_options(post_graph/3, 3, [content_type(any), response_graph(atom)]).
+:- predicate_options(post_resource/3, 3, [graph(atom)]).
 
 post_graph(Graph, URI, Options) :-
   must_be(atom, Graph),
@@ -43,7 +43,22 @@ post_graph(Graph, URI, Options) :-
       open_memory_file(File, write, Out),
       oslc_dispatch:serialize_response(stream(Out), Graph, Serializer),
       close(Out),
-      http_post(URI, memory_file(ContentType, File), _, Options1)
+      ( option(response_graph(ResponseGraph), Options)
+      -> must_be(atom, ResponseGraph),
+         setup_call_cleanup(
+           new_memory_file(ResponseFile), (
+             open_memory_file(ResponseFile, write, ResponseStream, [encoding(octet)]),
+             merge_options([headers(ResponseHeaders), to(stream(ResponseStream))], Options1, Options2),
+             http_post(URI, memory_file(ContentType, File), _, Options2),
+             close(ResponseStream),
+             open_memory_file(ResponseFile, read, Stream, [encoding(utf8)]),
+             ignore(read_response_body(ResponseHeaders, Stream, ResponseGraph)),
+             close(Stream)
+           ),
+           free_memory_file(ResponseFile)
+         )
+      ; http_post(URI, memory_file(ContentType, File), _, Options1)
+      )
     ),
     free_memory_file(File)
   ).
@@ -57,22 +72,7 @@ post_resource(IRI, URI, Options) :-
       -> copy_resource(IRI, IRI, rdf, rdf(Tmp), Options)
       ; copy_resource(IRI, IRI, rdf(Graph), rdf(Tmp), Options)
       ),
-      ( option(response_graph(ResponseGraph), Options)
-      -> must_be(atom, ResponseGraph),
-         setup_call_cleanup(
-           new_memory_file(File), (
-             open_memory_file(File, write, Response, [encoding(octet)]),
-             merge_options([headers(Fields), to(stream(Response))], Options, Options1),
-             post_graph(Tmp, URI, Options1),
-             close(Response),
-             open_memory_file(File, read, Stream, [encoding(utf8)]),
-             ignore(read_response_body(Fields, Stream, ResponseGraph)),
-             close(Stream)
-           ),
-           free_memory_file(File)
-         )
-      ; post_graph(Tmp, URI, Options)
-      )
+      post_graph(Tmp, URI, Options)
     ),
     delete_temp_graph(Tmp)
   ).
