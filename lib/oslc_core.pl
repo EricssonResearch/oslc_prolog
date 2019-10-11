@@ -1,5 +1,5 @@
 /*
-Copyright 2017 Ericsson AB
+Copyright 2017-2019 Ericsson AB
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,9 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-:- module(oslc_core, [
-  handle_post_resource/2
-]).
+:- module(oslc_core, [ handle_post_resource/2 ]).
 
 :- use_module(library(semweb/rdf11)).
 :- use_module(library(semweb/rdfs)).
@@ -153,12 +151,12 @@ handle_post_resource0(IRI, Source, Sink, NewResource) :-
   ; oslc_error('Missing resource in POST request to [~w]', [IRI])
   )),
   once((
-    unmarshal_property(NewResource, rdf:type, Class, _, Source),
+    oslc:unmarshal_property(NewResource, rdf:type, Class, _, Source),
     \+ rdf_is_bnode(NewResource)
   ; oslc_error('Missing resource type in POST request to [~w]', [IRI])
   )),
   once((
-    \+ unmarshal_property(NewResource, _, _, _, Sink)
+    \+ oslc:unmarshal_property(NewResource, _, _, _, Sink)
   ; oslc_error('Resource [~w] already exists', [NewResource])
   )),
   once((
