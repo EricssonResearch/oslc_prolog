@@ -495,6 +495,17 @@ copy_property(Value, Sink, IRITo, Property, Type, PropertyList) :-
 %
 %   Equivalent to =|delete_resource(IRI, Sink, [])|=.
 
+delete_resource(List, Sink) :-
+  is_list(List), !,
+  rdf_transaction(
+    forall(
+      member(IRI, List), (
+        check_iri(IRI, Id),
+        ignore(delete_resource0(Id, Sink, []))
+      )
+    )
+  ).
+
 delete_resource(IRI, Sink) :-
   check_iri(IRI, Id),
   rdf_transaction(
@@ -511,6 +522,17 @@ delete_resource(IRI, Sink) :-
 %    * neighbours
 %    Recursively delete all refererred resources (i.e. the ones that
 %    appear as objects in IRI) residing in the Sink.
+
+delete_resource(List, Sink, Options) :-
+  is_list(List), !,
+  rdf_transaction(
+    forall(
+      member(IRI, List), (
+        check_iri(IRI, Id),
+        ignore(delete_resource0(Id, Sink, Options))
+      )
+    )
+  ).
 
 delete_resource(IRI, Sink, Options) :-
   check_iri(IRI, Id),
