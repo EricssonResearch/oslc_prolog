@@ -22,7 +22,7 @@ limitations under the License.
 :- multifile lisp:func/2.
 
 lisp:func([copy, FromIRI, Source, ToIRI, Sink], Result) :- !,
-  lisp:result(oslc:copy_resource(FromIRI, ToIRI, rdf(Source), rdf(Sink), []), Result).
+  lisp:result(oslc:copy_resource(FromIRI, ToIRI, rdf(Source), rdf(Sink)), Result).
 
 lisp:func([copy, FromIRI, Source, ToIRI, Sink, Options], Result) :- !,
   lisp:result(oslc:copy_resource(FromIRI, ToIRI, rdf(Source), rdf(Sink), Options), Result).

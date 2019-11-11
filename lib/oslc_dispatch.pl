@@ -179,6 +179,9 @@ format_header(H, H2) :-
   format(atom(H2), '~w: ~w~n', [Header, Value]).
 
 serializer(application/'rdf+xml', xml).
+serializer(application/'xml+rdf', xml).
+serializer(text/'rdf+xml', xml).
+serializer(text/'xml+rdf', xml).
 serializer(application/turtle, turtle).
 serializer(application/'x-turtle', turtle).
 serializer(text/rdf, xml).

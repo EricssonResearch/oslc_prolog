@@ -27,7 +27,7 @@ limitations under the License.
 :- rdf_meta post_resource(r, -, -).
 
 :- predicate_options(post_graph/3, 3, [content_type(any), response_graph(atom)]).
-:- predicate_options(post_resource/3, 3, [graph(atom)]).
+:- predicate_options(post_resource/3, 3, [graph(atom), response_graph(atom)]).
 
 post_graph(Graph, URI, Options) :-
   must_be(atom, Graph),
