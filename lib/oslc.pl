@@ -1,5 +1,5 @@
 /*
-Copyright 2017 Ericsson AB
+Copyright 2019 Ericsson AB
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,21 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-:- module(oslc, [
-  create_resource/4,
-  applicable_shapes/2,
-  create_resource/5,
-  oslc_resource/2,
-  oslc_resource/3,
-  applicable_shapes/3,
-  copy_resource/5,
-  delete_resource/2,
-  delete_resource/3,
-  unmarshal_property/5,
-  marshal_property/5,
-  unmarshal_list_property/5,
-  marshal_list_property/5
-]).
+:- module(oslc, [ create_resource/4,
+                  applicable_shapes/2,
+                  create_resource/5,
+                  oslc_resource/2,
+                  oslc_resource/3,
+                  applicable_shapes/3,
+                  copy_resource/5,
+                  delete_resource/2,
+                  delete_resource/3,
+                  unmarshal_property/5,
+                  marshal_property/5,
+                  unmarshal_list_property/5,
+                  marshal_list_property/5 ]).
 
 %!  unmarshal_property(+IRI, +PropertyDefinition, -Value, -Type, +Source) is nondet.
 %!  unmarshal_list_property(+IRI, +PropertyDefinition, -Value, -Type, +Source) is det.
@@ -67,7 +65,8 @@ limitations under the License.
             applicable_shapes(r, -, -),
             copy_resource(r, r, -, -, -),
             copy_resource1(-, -, r, -, -, -, -, -, -),
-            delete_resource(r, -),
+            delete_resource(t, -),
+            delete_resource(t, -, -),
             rdfType(r),
             oslcInstanceShape(r).
 
@@ -495,50 +494,34 @@ copy_property(Value, Sink, IRITo, Property, Type, PropertyList) :-
 %
 %   Equivalent to =|delete_resource(IRI, Sink, [])|=.
 
-delete_resource(List, Sink) :-
-  is_list(List), !,
-  rdf_transaction(
-    forall(
-      member(IRI, List), (
-        check_iri(IRI, Id),
-        ignore(delete_resource0(Id, Sink, []))
-      )
-    )
-  ).
-
 delete_resource(IRI, Sink) :-
-  check_iri(IRI, Id),
-  rdf_transaction(
-    ignore(delete_resource0(Id, Sink, []))
-  ).
+  delete_resource(IRI, Sink, []).
 
 %!  delete_resource(+IRI, +Sink, +Options) is det.
 %
 %   Delete OSCL resource IRI from Sink recursively, i.e. including all
-%   of its local resources (blank nodes). If option =neighbours= is
-%   specified, recursively removes all referred resources from Sink.
-%   A list of Options may contain:
+%   of its local resources (blank nodes). If IRI is a list, all
+%   resources from the list are deleted in the same transaction.
+%   If option =neighbours= is specified, recursively removes all
+%   referred resources from Sink. A list of Options may contain:
 %
 %    * neighbours
 %    Recursively delete all refererred resources (i.e. the ones that
 %    appear as objects in IRI) residing in the Sink.
 
-delete_resource(List, Sink, Options) :-
-  is_list(List), !,
-  rdf_transaction(
-    forall(
-      member(IRI, List), (
-        check_iri(IRI, Id),
-        ignore(delete_resource0(Id, Sink, Options))
-      )
+delete_resource(IRI, Sink, Options) :-
+  ( is_list(IRI)
+  -> rdf_transaction(
+       maplist(delete_resource_(Options, Sink), IRI)
+     )
+  ; rdf_transaction(
+      delete_resource_(Options, Sink, IRI)
     )
   ).
 
-delete_resource(IRI, Sink, Options) :-
+delete_resource_(Options, Sink, IRI) :-
   check_iri(IRI, Id),
-  rdf_transaction(
-    ignore(delete_resource0(Id, Sink, Options))
-  ).
+  ignore(delete_resource0(Id, Sink, Options)).
 
 delete_resource0(IRI, Sink, Options) :-
   call_cleanup((
