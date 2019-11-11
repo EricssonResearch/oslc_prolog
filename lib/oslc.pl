@@ -17,6 +17,7 @@ limitations under the License.
 :- module(oslc, [ create_resource/4,
                   create_resource/5,
                   oslc_resource/3,
+                  copy_resource/4,
                   copy_resource/5,
                   delete_resource/2,
                   delete_resource/3,
@@ -54,7 +55,8 @@ limitations under the License.
 :- rdf_meta create_resource(r, t, t, -),
             create_resource(r, t, t, t, -),
             oslc_resource(r, t, -),
-            copy_resource(r, r, -, -, -),
+            copy_resource(t, t, -, -),
+            copy_resource(t, t, -, -, -),
             copy_resource1(-, -, r, -, -, -, -, -, -),
             delete_resource(r, -),
             delete_resource(r, -, -),
@@ -66,14 +68,6 @@ limitations under the License.
 
 :- dynamic copied/1, deleted/1.
 :- thread_local copied/1, deleted/1.
-
-check_iri(NS:Local, IRI) :- !,
-  must_be(atom, NS),
-  must_be(atom, Local),
-  rdf_global_id(NS:Local, IRI).
-
-check_iri(IRI, IRI) :-
-  must_be(atom, IRI).
 
 %!  create_resource(+IRI, +Types, +Properties, +Sink) is det.
 %
@@ -91,18 +85,17 @@ create_resource(IRI, Types, Properties, Sink) :-
 %   from given list of Shapes, which can be empty.
 
 create_resource(IRI, Types, Shapes, Properties, Sink) :-
-  check_iri(IRI, Id),
   must_be(list(atom), Types),
   must_be(list(atom), Shapes),
   must_be(list(ground), Properties),
   rdf_transaction((
-    delete_resource(Id, Sink),
-    marshal_list_property(Id, rdf:type, Types, _, Sink),
-    check_property(Id, oslc_shapes:oslcInstanceShape, _, Shapes, _),
-    marshal_list_property(Id, oslc:instanceShape, Shapes, _, Sink),
+    delete_resource(IRI, Sink),
+    marshal_list_property(IRI, rdf:type, Types, _, Sink),
+    check_property(IRI, oslc_shapes:oslcInstanceShape, _, Shapes, _),
+    marshal_list_property(IRI, oslc:instanceShape, Shapes, _, Sink),
     create_shapes_dict(Shapes, Dict),
-    oslc_resource0(Id, Dict, Properties, Sink),
-    check_resource(Id, Dict, Sink)
+    oslc_resource0(IRI, Dict, Properties, Sink),
+    check_resource(IRI, Dict, Sink)
   )).
 
 %!  oslc_resource(+IRI, +Properties, +SourceSink) is det.
@@ -119,11 +112,10 @@ create_resource(IRI, Types, Shapes, Properties, Sink) :-
 %   each property may appear in Properties only once.
 
 oslc_resource(IRI, Properties, SourceSink) :-
-  check_iri(IRI, Id),
   rdf_transaction((
-    applicable_shapes(Id, Shapes, SourceSink),
+    applicable_shapes(IRI, Shapes, SourceSink),
     create_shapes_dict(Shapes, Dict),
-    oslc_resource0(Id, Dict, Properties, SourceSink)
+    oslc_resource0(IRI, Dict, Properties, SourceSink)
   )).
 
 oslc_resource0(_, _, [], _) :- !.
@@ -191,6 +183,13 @@ marshal_some_property(IRI, PropertyDefinition, Value, Type, Sink) :-
   ; marshal_property(IRI, PropertyDefinition, Value, Type, Sink)
   ).
 
+%!  copy_resource(+IRIFrom, +IRITo, +Source, +Sink) is det.
+%
+%   Equivalent to =|copy_resource(+IRIFrom, +IRITo, +Source, +Sink, [])|=.
+
+copy_resource(IRIFrom, IRITo, Source, Sink) :-
+  copy_resource(IRIFrom, IRITo, Source, Sink, []).
+
 %!  copy_resource(+IRIFrom, +IRITo, +Source, +Sink, +Options) is det.
 %
 %   Copy OSCL resource IRIFrom in Source to IRITo in Sink recursively,
@@ -199,7 +198,8 @@ marshal_some_property(IRI, PropertyDefinition, Value, Type, Sink) :-
 %   referred resources, if =neighbours= option is specified) existed in
 %   Sink before copying is deleted. If IRIFrom and IRITo are lists of
 %   resources of equal sizes, all resources from IRIFrom are copied to
-%   corresponding resources from IRITo. A list of Options may contain:
+%   corresponding resources from IRITo in a single transaction. A list
+%   of Options may contain:
 %
 %    * inline(InlineSource)
 %    If specified, properties of resource IRIFrom described in a shape
@@ -242,15 +242,20 @@ marshal_some_property(IRI, PropertyDefinition, Value, Type, Sink) :-
 %    to all recursively copied referred resources if =neighbours=
 %    option is specified.
 
-copy_resource([], [], _, _, _) :- !.
 
-copy_resource([H|T], [H|T], Source, Sink, Options) :- !,
-  copy_resource(H, H, Source, Sink, Options),
-  copy_resource(T, T, Source, Sink, Options).
 
 copy_resource(IRIFrom, IRITo, Source, Sink, Options) :-
-  check_iri(IRIFrom, IdFrom),
-  check_iri(IRITo, IdTo),
+  ( is_list(IRIFrom),
+    is_list(IRITo)
+  -> rdf_transaction(
+       maplist(copy_resource_(Options, Source, Sink), IRIFrom, IRITo)
+     )
+  ; rdf_transaction(
+      copy_resource_(Options, Source, Sink, IRIFrom, IRITo)
+    )
+  ).
+
+copy_resource_(Options, Source, Sink, IRIFrom, IRITo) :-
   must_be(ground, Source),
   ( selectchk(prefix(Prefix), Options, O1)
   -> parse_prefix(Prefix, PrefixList)
@@ -261,14 +266,12 @@ copy_resource(IRIFrom, IRITo, Source, Sink, Options) :-
      O2 = [properties(PropertyList)|RestOptions2]
   ; O2 = O1
   ),
-  rdf_transaction(
-    call_cleanup((
-      applicable_shapes(IdFrom, Shapes, Source),
-      create_shapes_dict(Shapes, Dict),
-      copy_resource0(IdFrom, IdTo, Dict, Source, Sink, O2)
-    ),
-      retractall(copied(_))
-    )
+  call_cleanup((
+    applicable_shapes(IRIFrom, Shapes, Source),
+    create_shapes_dict(Shapes, Dict),
+    copy_resource0(IRIFrom, IRITo, Dict, Source, Sink, O2)
+  ),
+    retractall(copied(_))
   ).
 
 parse_prefix(Prefix, Structure) :-
@@ -391,7 +394,7 @@ delete_resource(IRI, Sink) :-
 %
 %   Delete OSCL resource IRI from Sink recursively, i.e. including all
 %   of its local resources (blank nodes). If IRI is a list, all
-%   resources from the list are deleted in the same transaction.
+%   resources from the list are deleted a single transaction.
 %   If option =neighbours= is specified, recursively removes all
 %   referred resources from Sink. A list of Options may contain:
 %
@@ -410,9 +413,8 @@ delete_resource(IRI, Sink, Options) :-
   ).
 
 delete_resource_(Options, Sink, IRI) :-
-  check_iri(IRI, Id),
   call_cleanup(
-    ignore(delete_resource0(Id, Sink, Options)),
+    ignore(delete_resource0(IRI, Sink, Options)),
     retractall(deleted(_))
   ).
 

@@ -167,7 +167,7 @@ handle_post_resource0(IRI, Source, Sink, NewResource) :-
     memberchk(Class, Classes)
   ; oslc_error('Creation factory [~w] does not support type [~w]', [IRI, Class])
   )),
-  copy_resource(NewResource, NewResource, Source, Sink, []).
+  copy_resource(NewResource, NewResource, Source, Sink).
 
 handle_put(Context) :-
   catch(
@@ -189,7 +189,7 @@ handle_put0(Context) :-
   autodetect_resource_graph(IRI, Graph),
   once((
     resource_md5(IRI, Graph, ReceivedHash),
-    copy_resource(IRI, IRI, rdf(Context.graph_in), rdf(Graph), []),
+    copy_resource(IRI, IRI, rdf(Context.graph_in), rdf(Graph)),
     response(204) % no content
   ; format(atom(Message), 'The value of [If-Match] header does not match [~w]', [Context.iri_spec]),
     throw(response(412, Message)) % precondition failed
