@@ -1,5 +1,5 @@
 /*
-Copyright 2017 Ericsson AB
+Copyright 2017-2019 Ericsson AB
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,42 +14,115 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-:- module(oslc_shape, [
-  check_occurs/4,
-  check_value_type/4,
-  literal_types/1,
-  is_literal_type/1,
-  unmarshal_type/3
-]).
+:- module(oslc_shape, [ applicable_shapes/2,
+                        create_shapes_dict/2,
+                        check_resource/3,
+                        applicable_shapes/3,
+                        check_property/5 ] ).
 
 :- use_module(library(semweb/rdf_db), [rdf_is_resource/1]).
 :- use_module(library(semweb/rdf11)).
 :- use_module(library(semweb/rdfs)).
+:- use_module(library(oslc_types)).
 :- use_module(library(oslc_error)).
 
-:- rdf_meta check_occurs(r, r, -, -).
-:- rdf_meta format_value(r, -, -).
-:- rdf_meta check_value_type(r, r, -, r).
-:- rdf_meta check_value(r, r, -, r).
-:- rdf_meta literal_types(t).
-:- rdf_meta is_literal_type(r).
+:- rdf_meta applicable_shapes(t, -),
+            check_resource(r, -, -),
+            applicable_shapes(r, -, -),
+            check_property(r, r, r, -, -),
+            format_value(r, -, -),
+            check_value(r, r, -, r).
 
-:- rdf_meta oslc_LocalResource(r).
-:- rdf_meta oslc_Resource(r).
+%!  applicable_shapes(+Types, -Shapes) is det.
+%
+%   True if Shapes is a list of resource shapes applicable to OSLC
+%   resources of given list of Types.
 
-oslc_LocalResource(oslc:'LocalResource').
-oslc_Resource(oslc:'Resource').
+applicable_shapes(Types, Shapes) :-
+  must_be(list(atom), Types),
+  findall(ResourceShape, (
+    member(Type, Types),
+    rdf(ResourceShape, rdf:type, oslc:'ResourceShape'),
+    rdf(ResourceShape, oslc:describes, Type)
+  ), Shapes).
 
-% ------------ CHECK PROPERTY OCCURS
+create_shapes_dict(Shapes, Dict) :-
+  findall(ShapeData, (
+    member(Shape, Shapes),
+    (
+      findall(K=V, (
+        rdf(Shape, oslc:property, PropertyResource),
+        once((
+          rdf(PropertyResource, oslc:propertyDefinition, K),
+          rdf(PropertyResource, oslc:occurs, Occurs),
+          rdf(PropertyResource, oslc:name, Name^^xsd:string)
+        ; oslc_error('Error while processing resource shape [~w]', [Shape])
+        )),
+        Va = _{resource:PropertyResource, name:Name, occurs:Occurs},
+        once((
+          rdf(PropertyResource, oslc:representation, Representation),
+          V = Va.put(representation, Representation)
+        ; V = Va
+        ))
+      ),
+      ShapeData)
+    )
+  ), ShapesData),
+  flatten(ShapesData, DictData),
+  catch(
+    dict_create(Dict, _, DictData),
+    error(duplicate_key(X), _),
+    oslc_error('Dulicate definition of property [~w] in resource shapes ~w', [X, Shapes])
+  ).
 
-check_occurs(IRI, PropertyResource, InternalValue, ReadValue) :-
+check_resource(IRI, Dict, Source) :-
+  forall((
+    Dict.PropertyDefinition.resource = PropertyResource
+  ), (
+    oslc:unmarshal_list_property(IRI, PropertyDefinition, Values, Type, Source),
+    check_property(IRI, PropertyResource, Type, Values, _),
+    ( rdf_equal(Dict.get(PropertyDefinition).get(representation), oslc:'Inline')
+    -> forall(
+         member(Value, Values),
+         (
+           applicable_shapes(Value, BnodeShapes, Source),
+           create_shapes_dict(BnodeShapes, BnodeDict),
+           check_resource(Value, BnodeDict, Source)
+         )
+       )
+    ; true
+    )
+  )).
+
+%!  applicable_shapes(+IRI, -Shapes, +Source) is det.
+%
+%   True if Shapes is a list of resource shapes applicable to OSLC
+%   resource IRI from Source.
+
+applicable_shapes(IRI, Shapes, Source) :-
+  must_be(atom, IRI),
+  oslc:unmarshal_list_property(IRI, oslc:instanceShape, ReadShapes, _, Source),
+  oslc:unmarshal_list_property(IRI, rdf:type, Types, _, Source),
+  findall(ResourceShape, (
+    member(ResourceShape, ReadShapes),
+    once((
+      \+ rdf(ResourceShape, oslc:describes, _)
+    ; member(Type, Types),
+      rdf(ResourceShape, oslc:describes, Type)
+    ))
+  ), Shapes).
+
+% ------------ CHECK PROPERTY
+
+check_property(IRI, PropertyResource, Type, InternalValue, Value) :-
   once((
     rdf(PropertyResource, oslc:occurs, Occurs),
-    ( format_value(Occurs, InternalValue, ReadValue)
+    ( format_value(Occurs, InternalValue, Value)
     ; rdf(PropertyResource, oslc:propertyDefinition, PropertyDefinition),
       oslc_error("Property [~w] of resource [~w] must have cardinality [~w]", [PropertyDefinition, IRI, Occurs])
     )
-  )).
+  )),
+  check_value_type(IRI, PropertyResource, InternalValue, Type).
 
 format_value(oslc:'Zero-or-one', [], V) :-
   var(V) ; V == [].
@@ -183,31 +256,3 @@ check_allowed_value_type(IRI, PropertyResource, AllowedValue, Type) :-
   ; rdf(PropertyResource, oslc:propertyDefinition, PropertyDefinition),
     oslc_error("The allowed value [~w] of resource [~w] does not satisfy the type of property [~w]", [AllowedValue, IRI, PropertyDefinition])
   )).
-
-% ------------ LITERAL TYPES
-
-literal_types([ rdf:'XMLLiteral',
-                xsd:string,
-                xsd:integer,
-                xsd:float,
-                xsd:double,
-                xsd:decimal,
-                xsd:dateTime,
-                xsd:boolean
-              ]).
-
-is_literal_type(Type) :-
-  literal_types(LT),
-  memberchk(Type, LT).
-
-% ------------ VALUE UNMARSHALLING
-
-unmarshal_type(Value^^Type, Value, Type) :- !,
-  is_literal_type(Type).
-
-unmarshal_type(Value, Value, Type) :-
-  ( rdf_is_bnode(Value)
-  -> oslc_LocalResource(Type)
-  ; rdf_is_resource(Value),
-    oslc_Resource(Type)
-  ).

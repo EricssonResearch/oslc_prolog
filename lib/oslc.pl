@@ -1,5 +1,5 @@
 /*
-Copyright 2019 Ericsson AB
+Copyright 2017-2019 Ericsson AB
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,18 +15,13 @@ limitations under the License.
 */
 
 :- module(oslc, [ create_resource/4,
-                  applicable_shapes/2,
                   create_resource/5,
-                  oslc_resource/2,
                   oslc_resource/3,
-                  applicable_shapes/3,
                   copy_resource/5,
                   delete_resource/2,
                   delete_resource/3,
-                  unmarshal_property/5,
-                  marshal_property/5,
                   unmarshal_list_property/5,
-                  marshal_list_property/5 ]).
+                  marshal_list_property/5 ] ).
 
 %!  unmarshal_property(+IRI, +PropertyDefinition, -Value, -Type, +Source) is nondet.
 %!  unmarshal_list_property(+IRI, +PropertyDefinition, -Value, -Type, +Source) is det.
@@ -44,7 +39,6 @@ limitations under the License.
 
 :- multifile marshal_property/5.
 
-
 %!  delete_property(+IRI, +PropertyDefinition, +Sink) is det.
 %
 %   Interface to define a procedure of deleting all values of property
@@ -53,25 +47,22 @@ limitations under the License.
 :- multifile delete_property/3.
 
 :- use_module(library(semweb/rdf11)).
+:- use_module(library(oslc_types)).
 :- use_module(library(oslc_shape)).
-:- use_module(library(oslc_rdf)).
 :- use_module(library(oslc_error)).
 
 :- rdf_meta create_resource(r, t, t, -),
-            applicable_shapes(t, -),
             create_resource(r, t, t, t, -),
-            oslc_resource(r, t),
             oslc_resource(r, t, -),
-            applicable_shapes(r, -, -),
             copy_resource(r, r, -, -, -),
             copy_resource1(-, -, r, -, -, -, -, -, -),
-            delete_resource(t, -),
-            delete_resource(t, -, -),
-            rdfType(r),
-            oslcInstanceShape(r).
-
-rdfType(rdf:type).
-oslcInstanceShape(oslc:instanceShape).
+            delete_resource(r, -),
+            delete_resource(r, -, -),
+            unmarshal_property(r, r, -, -, -),
+            unmarshal_list_property(r, r, -, -, -),
+            marshal_property(r, r, -, -, -),
+            marshal_list_property(r, r, -, -, -),
+            delete_property(r, r, -).
 
 :- dynamic copied/1, deleted/1.
 :- thread_local copied/1, deleted/1.
@@ -106,88 +97,13 @@ create_resource(IRI, Types, Shapes, Properties, Sink) :-
   must_be(list(ground), Properties),
   rdf_transaction((
     delete_resource(Id, Sink),
-    rdfType(RT),
-    marshal_list_property(Id, RT, Types, _, Sink),
-    rdf_global_id(oslc_shapes:oslcInstanceShape, IOSS),
-    check_property(Id, IOSS, _, Shapes, _),
-    oslcInstanceShape(OIS),
-    marshal_list_property(Id, OIS, Shapes, _, Sink),
+    marshal_list_property(Id, rdf:type, Types, _, Sink),
+    check_property(Id, oslc_shapes:oslcInstanceShape, _, Shapes, _),
+    marshal_list_property(Id, oslc:instanceShape, Shapes, _, Sink),
     create_shapes_dict(Shapes, Dict),
     oslc_resource0(Id, Dict, Properties, Sink),
     check_resource(Id, Dict, Sink)
   )).
-
-%!  applicable_shapes(+Types, -Shapes) is det.
-%
-%   True if Shapes is a list of resource shapes applicable to OSLC
-%   resources of given list of Types.
-
-applicable_shapes(Types, Shapes) :-
-  must_be(list(atom), Types),
-  findall(ResourceShape, (
-    member(Type, Types),
-    rdf(ResourceShape, rdf:type, oslc:'ResourceShape'),
-    rdf(ResourceShape, oslc:describes, Type)
-  ), Shapes).
-
-create_shapes_dict(Shapes, Dict) :-
-  findall(ShapeData, (
-    member(Shape, Shapes),
-    (
-      findall(K=V, (
-        rdf(Shape, oslc:property, PropertyResource),
-        once((
-          rdf(PropertyResource, oslc:propertyDefinition, K),
-          rdf(PropertyResource, oslc:occurs, Occurs),
-          rdf(PropertyResource, oslc:name, Name^^xsd:string)
-        ; oslc_error('Error while processing resource shape [~w]', [Shape])
-        )),
-        Va = _{resource:PropertyResource, name:Name, occurs:Occurs},
-        once((
-          rdf(PropertyResource, oslc:representation, Representation),
-          V = Va.put(representation, Representation)
-        ; V = Va
-        ))
-      ),
-      ShapeData)
-    )
-  ), ShapesData),
-  flatten(ShapesData, DictData),
-  catch(
-    dict_create(Dict, _, DictData),
-    error(duplicate_key(X), _),
-    oslc_error('Dulicate definition of property [~w] in resource shapes ~w', [X, Shapes])
-  ).
-
-check_resource(IRI, Dict, Source) :-
-  forall((
-    Dict.PropertyDefinition.resource = PropertyResource
-  ), (
-    unmarshal_list_property(IRI, PropertyDefinition, Values, Type, Source),
-    check_property(IRI, PropertyResource, Type, Values, _),
-    ( rdf_equal(Dict.get(PropertyDefinition).get(representation), oslc:'Inline')
-    -> forall(
-         member(Value, Values),
-         (
-           applicable_shapes(Value, BnodeShapes, Source),
-           create_shapes_dict(BnodeShapes, BnodeDict),
-           check_resource(Value, BnodeDict, Source)
-         )
-       )
-    ; true
-    )
-  )).
-
-%!  oslc_resource(+IRI, +Properties) is det.
-%
-%   Similar to oslc_resource/3, but tries to autodetect named graph
-%   =Graph= where resource IRI is defined and use =|rdf(Graph)|=
-%   for _SourceSink_.
-
-oslc_resource(IRI, Properties) :-
-  check_iri(IRI, Id),
-  autodetect_resource_graph(Id, Graph),
-  oslc_resource(Id, Properties, rdf(Graph)).
 
 %!  oslc_resource(+IRI, +Properties, +SourceSink) is det.
 %
@@ -209,26 +125,6 @@ oslc_resource(IRI, Properties, SourceSink) :-
     create_shapes_dict(Shapes, Dict),
     oslc_resource0(Id, Dict, Properties, SourceSink)
   )).
-
-%!  applicable_shapes(+IRI, -Shapes, +Source) is det.
-%
-%   True if Shapes is a list of resource shapes applicable to OSLC
-%   resource IRI from Source.
-
-applicable_shapes(IRI, Shapes, Source) :-
-  check_iri(IRI, Id),
-  oslcInstanceShape(OIS),
-  unmarshal_list_property(Id, OIS, ReadShapes, _, Source),
-  rdfType(RT),
-  unmarshal_list_property(Id, RT, Types, _, Source),
-  findall(ResourceShape, (
-    member(ResourceShape, ReadShapes),
-    once((
-      \+ rdf(ResourceShape, oslc:describes, _)
-    ; member(Type, Types),
-      rdf(ResourceShape, oslc:describes, Type)
-    ))
-  ), Shapes).
 
 oslc_resource0(_, _, [], _) :- !.
 
@@ -254,12 +150,6 @@ oslc_resource0(Id, Dict, [Property=Value|RemainingProperties], SourceSink) :-
     )
   )),
   oslc_resource0(Id, Dict, RemainingProperties, SourceSink).
-
-% ------------ CHECK PROPERTY
-
-check_property(IRI, PropertyResource, Type, InternalValue, Value) :-
-  check_occurs(IRI, PropertyResource, InternalValue, Value),
-  check_value_type(IRI, PropertyResource, InternalValue, Type).
 
 % ------------ READ PROPERTY
 
@@ -521,22 +411,22 @@ delete_resource(IRI, Sink, Options) :-
 
 delete_resource_(Options, Sink, IRI) :-
   check_iri(IRI, Id),
-  ignore(delete_resource0(Id, Sink, Options)).
+  call_cleanup(
+    ignore(delete_resource0(Id, Sink, Options)),
+    retractall(deleted(_))
+  ).
 
 delete_resource0(IRI, Sink, Options) :-
-  call_cleanup((
-    forall((
-      unmarshal_property(IRI, _, Value, Type, Sink),
-      ( rdf_equal(oslc:'LocalResource', Type)
-      ; memberchk(neighbours, Options),
-        rdf_equal(oslc:'Resource', Type)
-      ),
-      \+ deleted(Value)
-    ), (
-      delete_resource0(Value, Sink, Options),
-      assertz(deleted(Value))
-    ))
-  ),
-    retractall(deleted(_))
-  ),
+  forall((
+    unmarshal_property(IRI, _, Value, Type, Sink),
+    once((
+      rdf_equal(oslc:'LocalResource', Type)
+    ; memberchk(neighbours, Options),
+      rdf_equal(oslc:'Resource', Type)
+    )),
+    \+ deleted(Value)
+  ), (
+    delete_resource0(Value, Sink, Options),
+    assertz(deleted(Value))
+  )),
   delete_property(IRI, _, Sink).

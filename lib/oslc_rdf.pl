@@ -1,5 +1,5 @@
 /*
-Copyright 2017 Ericsson AB
+Copyright 2017-2019 Ericsson AB
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,31 +14,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-:- module(oslc_rdf, [
-  make_temp_graph/1,
-  pass_temp_graph/2,
-  delete_temp_graph/1,
-  clean_temp_graphs/0,
-  autodetect_resource_graph/2,
-  resource_md5/3,
-  graph_md5/2
-]).
+:- module(oslc_rdf, [ make_temp_graph/1,
+                      pass_temp_graph/2,
+                      delete_temp_graph/1,
+                      clean_temp_graphs/0,
+                      autodetect_resource_graph/2,
+                      resource_md5/3,
+                      graph_md5/2 ] ).
 
-:- use_module(library(semweb/rdf_db), [rdf_is_resource/1]).
 :- use_module(library(semweb/rdf11)).
 :- use_module(library(semweb/rdf_persistency)).
-:- use_module(library(oslc_shape)).
+:- use_module(library(oslc_types)).
 
-:- rdf_meta autodetect_resource_graph(r, -).
-:- rdf_meta resource_md5(r, -, -).
+:- rdf_meta autodetect_resource_graph(r, -),
+            resource_md5(r, -, -).
 
 :- dynamic temp_graph/1.
 
 :- thread_local temp_graph/1.
 
-:- multifile marshal_property/5,
-             unmarshal_property/5,
-             delete_property/3.
+:- multifile oslc:marshal_property/5,
+             oslc:unmarshal_property/5,
+             oslc:delete_property/3.
 
 % ------------ RDF SOURCE / SINK
 

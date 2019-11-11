@@ -1,5 +1,5 @@
 /*
-Copyright 2017 Ericsson AB
+Copyright 2017-2019 Ericsson AB
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -66,10 +66,10 @@ shape_row(Shape) -->
     http_link_to_id(oslc_shape, [s=Shape], ShapeURI),
     findall(Mandatory, (
       rdf(Shape, oslc:property, Property),
-      rdf(Property, oslc:occurs, Occurs),
-      rdf_global_id(oslc:'Exactly-one', EO),
-      rdf_global_id(oslc:'One-or-many', OM),
-      member(Occurs, [EO, OM]),
+      once((
+        rdf(Property, oslc:occurs, oslc:'Exactly-one')
+      ; rdf(Property, oslc:occurs, oslc:'One-or-many')
+      )),
       rdf(Property, oslc:propertyDefinition, PropertyDefinition),
       Mandatory = div(\rdf_link(PropertyDefinition))
     ), Mandatories),

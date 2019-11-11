@@ -1,5 +1,5 @@
 /*
-Copyright 2017 Ericsson AB
+Copyright 2017-2019 Ericsson AB
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -132,8 +132,7 @@ format_error_response(Request, StatusCode, Message, Headers) :-
   -> ErrorMessage = Message
   ; once(oslc_dispatch:error_message(StatusCode, ErrorMessage))
   ),
-  rdf_global_id(oslc_shapes:errorShape, ES),
-  create_resource('error', [oslc:'Error'], [ES], [statusCode = StatusCode, message = ErrorMessage], tmp(GraphErr)),
+  create_resource('error', [oslc:'Error'], [oslc_shapes:errorShape], [statusCode = StatusCode, message = ErrorMessage], tmp(GraphErr)),
   catch(
     check_accept(Request, ContentType),
     _,
