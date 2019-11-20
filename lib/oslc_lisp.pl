@@ -16,21 +16,42 @@ limitations under the License.
 
 :- module(oslc_lisp, []).
 
+:- use_module(library(semweb/rdf11)).
+:- use_module(library(semweb/rdf_db), [rdf_is_resource/1]).
 :- use_module(library(oslc)).
 :- use_module(library(oslc_client)).
 
 :- multifile lisp:func/3.
 
 lisp:func(copy, [FromIRI, Source, ToIRI, Sink], Result) :- !,
-  lisp:lit_to_atom(Source, SourceA),
-  lisp:lit_to_atom(Sink, SinkA),
-  lisp:result(oslc:copy_resource(FromIRI, ToIRI, rdf(SourceA), rdf(SinkA)), Result).
+  lisp:func(copy, [FromIRI, Source, ToIRI, Sink, []], Result).
 
 lisp:func(copy, [FromIRI, Source, ToIRI, Sink, Options], Result) :- !,
   lisp:lit_to_atom(Source, SourceA),
   lisp:lit_to_atom(Sink, SinkA),
   maplist(lisp:lit_to_term, Options, OptionsT),
-  lisp:result(oslc:copy_resource(FromIRI, ToIRI, rdf(SourceA), rdf(SinkA), OptionsT), Result).
+  ( rdf_is_literal(FromIRI)
+  -> ( rdf_is_resource(ToIRI)
+     -> ( forall(
+            rdf(S, P, ToIRI, SinkA), (
+              ( memberchk(merge, OptionsT)
+              -> true
+              ; rdf_retractall(S, P, ToIRI, SinkA),
+                ( rdf_is_bnode(ToIRI)
+                -> oslc:delete_resource(ToIRI, rdf(SinkA))
+                ; true
+                )
+              ),
+              rdf_assert(S, P, FromIRI, SinkA)
+            )
+          )
+        -> Result = true
+        ; Result = false
+        )
+     ; Result = false
+     )
+  ; lisp:result(oslc:copy_resource(FromIRI, ToIRI, rdf(SourceA), rdf(SinkA), OptionsT), Result)
+  ).
 
 lisp:func(delete, [IRI, Sink], Result) :- !,
   lisp:lit_to_atom(Sink, SinkA),

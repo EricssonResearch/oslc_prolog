@@ -48,6 +48,7 @@ limitations under the License.
 :- multifile delete_property/3.
 
 :- use_module(library(semweb/rdf11)).
+:- use_module(library(semweb/rdf_db), [rdf_is_resource/1]).
 :- use_module(library(oslc_types)).
 :- use_module(library(oslc_shape)).
 :- use_module(library(oslc_error)).
@@ -257,6 +258,8 @@ copy_resource(IRIFrom, IRITo, Source, Sink, Options) :-
 
 copy_resource_(Options, Source, Sink, IRIFrom, IRITo) :-
   must_be(ground, Source),
+  rdf_is_resource(IRIFrom),
+  rdf_is_resource(IRITo),
   ( selectchk(prefix(Prefix), Options, O1)
   -> parse_prefix(Prefix, PrefixList)
   ; O1 = Options
@@ -419,6 +422,7 @@ delete_resource_(Options, Sink, IRI) :-
   ).
 
 delete_resource0(IRI, Sink, Options) :-
+  rdf_is_resource(IRI),
   forall((
     unmarshal_property(IRI, _, Value, Type, Sink),
     once((
