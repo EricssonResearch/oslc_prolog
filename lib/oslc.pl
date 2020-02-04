@@ -417,7 +417,9 @@ delete_resource(IRI, Sink, Options) :-
 
 delete_resource_(Options, Sink, IRI) :-
   call_cleanup(
-    ignore(delete_resource0(IRI, Sink, Options)),
+    ( assertz(deleted(IRI)),
+      ignore(delete_resource0(IRI, Sink, Options))
+    ),
     retractall(deleted(_))
   ).
 
