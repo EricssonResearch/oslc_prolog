@@ -434,7 +434,7 @@ delete_resource0(IRI, Sink, Options) :-
     )),
     \+ deleted(Value)
   ), (
-    delete_resource0(Value, Sink, Options),
-    assertz(deleted(Value))
+    assertz(deleted(Value)),
+    delete_resource0(Value, Sink, Options)
   )),
   delete_property(IRI, _, Sink).
