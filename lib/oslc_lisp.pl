@@ -1,5 +1,5 @@
 /*
-Copyright 2019 Ericsson AB
+Copyright 2019-2020 Ericsson AB
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,62 +21,45 @@ limitations under the License.
 :- use_module(library(oslc)).
 :- use_module(library(oslc_client)).
 
-:- multifile lisp:func/3.
+:- multifile lisp:funct/3.
 
-lisp:func(copy, [FromIRI, Source, ToIRI, Sink], Result) :- !,
-  lisp:func(copy, [FromIRI, Source, ToIRI, Sink, []], Result).
+lisp:funct(copy, [FromIRI, Source, ToIRI, Sink], Result) :- !,
+  lisp:funct(copy, [FromIRI, Source, ToIRI, Sink, []], Result).
 
-lisp:func(copy, [FromIRI, Source, ToIRI, Sink, Options], Result) :- !,
-  lisp:lit_to_atom(Source, SourceA),
-  lisp:lit_to_atom(Sink, SinkA),
-  maplist(lisp:lit_to_term, Options, OptionsT),
+lisp:funct(copy, [FromIRI, Source, ToIRI, Sink, Options], true) :- !,
   ( rdf_is_literal(FromIRI)
   -> ( rdf_is_resource(ToIRI)
-     -> ( forall(
-            rdf(S, P, ToIRI, SinkA), (
-              ( memberchk(merge, OptionsT)
-              -> true
-              ; rdf_retractall(S, P, ToIRI, SinkA),
-                ( rdf_is_bnode(ToIRI)
-                -> oslc:delete_resource(ToIRI, rdf(SinkA))
-                ; true
-                )
-              ),
-              rdf_assert(S, P, FromIRI, SinkA)
-            )
+     -> forall(
+          rdf(S, P, ToIRI, Sink), (
+            ( memberchk(merge, Options)
+            -> true
+            ; rdf_retractall(S, P, ToIRI, Sink),
+              ( rdf_is_bnode(ToIRI)
+              -> oslc:delete_resource(ToIRI, rdf(Sink))
+              ; true
+              )
+            ),
+            rdf_assert(S, P, FromIRI, Sink)
           )
-        -> Result = true
-        ; Result = false
         )
-     ; Result = false
      )
-  ; lisp:result(oslc:copy_resource(FromIRI, ToIRI, rdf(SourceA), rdf(SinkA), OptionsT), Result)
+  ; oslc:copy_resource(FromIRI, ToIRI, rdf(Source), rdf(Sink), Options)
   ).
 
-lisp:func(delete, [IRI, Sink], Result) :- !,
-  lisp:lit_to_atom(Sink, SinkA),
-  lisp:result(oslc:delete_resource(IRI, rdf(SinkA)), Result).
+lisp:funct(delete, [IRI, Sink], true) :- !,
+  oslc:delete_resource(IRI, rdf(Sink)).
 
-lisp:func(delete, [IRI, Sink, Options], Result) :- !,
-  lisp:lit_to_atom(Sink, SinkA),
-  maplist(lisp:lit_to_term, Options, OptionsT),
-  lisp:result(oslc:delete_resource(IRI, rdf(SinkA), OptionsT), Result).
+lisp:funct(delete, [IRI, Sink, Options], true) :- !,
+  oslc:delete_resource(IRI, rdf(Sink), Options).
 
-lisp:func(send, [IRI, URI], Result) :- !,
-  lisp:lit_to_atom(URI, URIA),
-  lisp:result(oslc_client:post_resource(IRI, URIA, []), Result).
+lisp:funct(send, [IRI, URI], true) :- !,
+  oslc_client:post_resource(IRI, URI, []).
 
-lisp:func(send, [IRI, URI, Options], Result) :- !,
-  lisp:lit_to_atom(URI, URIA),
-  maplist(lisp:lit_to_term, Options, OptionsT),
-  lisp:result(oslc_client:post_resource(IRI, URIA, OptionsT), Result).
+lisp:funct(send, [IRI, URI, Options], true) :- !,
+  oslc_client:post_resource(IRI, URI, Options).
 
-lisp:func(send_graph, [Graph, URI], Result) :- !,
-  lisp:lit_to_atom(URI, URIA),
-  lisp:result(oslc_client:post_graph(Graph, URIA, []), Result).
+lisp:funct(send_graph, [Graph, URI], true) :- !,
+  oslc_client:post_graph(Graph, URI, []).
 
-lisp:func(send_graph, [Graph, URI, Options], Result) :- !,
-  lisp:lit_to_atom(Graph, GraphA),
-  lisp:lit_to_atom(URI, URIA),
-  maplist(lisp:lit_to_term, Options, OptionsT),
-  lisp:result(oslc_client:post_graph(GraphA, URIA, OptionsT), Result).
+lisp:funct(send_graph, [Graph, URI, Options], true) :- !,
+  oslc_client:post_graph(Graph, URI, Options).
