@@ -47,14 +47,14 @@ limitations under the License.
 :- multifile serialize_response/3.
 :- multifile error_message/2.
 
-:- meta_predicate(oslc_get(+, 3)).
-:- meta_predicate(oslc_get(+, 3, +)).
-:- meta_predicate(oslc_post(+, 4)).
-:- meta_predicate(oslc_post(+, 4, +)).
-:- meta_predicate(oslc_put(+, 4)).
-:- meta_predicate(oslc_put(+, 4, +)).
-:- meta_predicate(oslc_delete(+, 2)).
-:- meta_predicate(oslc_delete(+, 2, +)).
+:- meta_predicate(oslc_get(+, :)).
+:- meta_predicate(oslc_get(+, :, +)).
+:- meta_predicate(oslc_post(+, :)).
+:- meta_predicate(oslc_post(+, :, +)).
+:- meta_predicate(oslc_put(+, :)).
+:- meta_predicate(oslc_put(+, :, +)).
+:- meta_predicate(oslc_delete(+, :)).
+:- meta_predicate(oslc_delete(+, :, +)).
 
 :- dynamic handler/4.
 
