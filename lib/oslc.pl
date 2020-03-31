@@ -67,7 +67,6 @@ limitations under the License.
             marshal_list_property(r, r, -, -, -),
             delete_property(r, r, -).
 
-:- dynamic copied/1, deleted/1.
 :- thread_local copied/1, deleted/1.
 
 %!  create_resource(+IRI, +Types, +Properties, +Sink) is det.
