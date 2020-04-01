@@ -16,41 +16,7 @@ limitations under the License.
 
 :- module(oslc_lisp, []).
 
-:- use_module(library(semweb/rdf11)).
-:- use_module(library(semweb/rdf_db), [rdf_is_resource/1]).
-:- use_module(library(oslc)).
-:- use_module(library(oslc_client)).
-
 :- multifile lisp:funct/3.
-
-lisp:funct(copy, [FromIRI, Source, ToIRI, Sink], Result) :- !,
-  lisp:funct(copy, [FromIRI, Source, ToIRI, Sink, []], Result).
-
-lisp:funct(copy, [FromIRI, Source, ToIRI, Sink, Options], true) :- !,
-  ( rdf_is_literal(FromIRI)
-  -> ( rdf_is_resource(ToIRI)
-     -> forall(
-          rdf(S, P, ToIRI, Sink), (
-            ( memberchk(merge, Options)
-            -> true
-            ; rdf_retractall(S, P, ToIRI, Sink),
-              ( rdf_is_bnode(ToIRI)
-              -> oslc:delete_resource(ToIRI, rdf(Sink))
-              ; true
-              )
-            ),
-            rdf_assert(S, P, FromIRI, Sink)
-          )
-        )
-     )
-  ; oslc:copy_resource(FromIRI, ToIRI, rdf(Source), rdf(Sink), Options)
-  ).
-
-lisp:funct(delete, [IRI, Sink], true) :- !,
-  oslc:delete_resource(IRI, rdf(Sink)).
-
-lisp:funct(delete, [IRI, Sink, Options], true) :- !,
-  oslc:delete_resource(IRI, rdf(Sink), Options).
 
 lisp:funct(send, [IRI, URI], true) :- !,
   oslc_client:post_resource(IRI, URI, []).
