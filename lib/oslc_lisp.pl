@@ -16,6 +16,8 @@ limitations under the License.
 
 :- module(oslc_lisp, []).
 
+:- use_module(library(oslc_client)).
+
 :- multifile lisp:funct/3.
 
 lisp:funct(send, [IRI, URI], true) :- !,
