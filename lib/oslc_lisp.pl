@@ -21,13 +21,17 @@ limitations under the License.
 :- multifile lisp:funct/3.
 
 lisp:funct(send, [IRI, URI], true) :- !,
+  debug(_, 'sending to  ~w', [URI]),
   oslc_client:post_resource(IRI, URI, []).
 
 lisp:funct(send, [IRI, URI, Options], true) :- !,
+  debug(_, 'sending to  ~w', [URI]),
   oslc_client:post_resource(IRI, URI, Options).
 
 lisp:funct(send_graph, [Graph, URI], true) :- !,
+  debug(_, 'sending to  ~w', [URI]),
   oslc_client:post_graph(Graph, URI, []).
 
 lisp:funct(send_graph, [Graph, URI, Options], true) :- !,
+  debug(_, 'sending to  ~w', [URI]),
   oslc_client:post_graph(Graph, URI, Options).
