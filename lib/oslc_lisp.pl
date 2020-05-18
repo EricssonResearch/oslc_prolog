@@ -25,7 +25,7 @@ lisp:funct(send, [ResourceIRI, PostURI], true) :- !,
   oslc_client:post_resource(ResourceIRI, PostURI, []).
 
 lisp:funct(send, [ResourceIRI, PostURI, Options], true) :- !,
-debug(lisp(oslc), 'POSTing resource [~w] to [~w]', [ResourceIRI, PostURI]),
+  debug(lisp(oslc), 'POSTing resource [~w] to [~w]', [ResourceIRI, PostURI]),
   oslc_client:post_resource(ResourceIRI, PostURI, Options).
 
 lisp:funct(send_graph, [GraphIRI, PostURI], true) :- !,
