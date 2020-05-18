@@ -20,18 +20,18 @@ limitations under the License.
 
 :- multifile lisp:funct/3.
 
-lisp:funct(send, [IRI, URI], true) :- !,
-  debug(lisp(oslc), 'POSTing resource [~w] to [~w]', [IRI, URI]),
-  oslc_client:post_resource(IRI, URI, []).
+lisp:funct(send, [ResourceIRI, PostURI], true) :- !,
+  debug(lisp(oslc), 'POSTing resource [~w] to [~w]', [ResourceIRI, PostURI]),
+  oslc_client:post_resource(ResourceIRI, PostURI, []).
 
-lisp:funct(send, [IRI, URI, Options], true) :- !,
-debug(lisp(oslc), 'POSTing resource [~w] to [~w]', [IRI, URI]),
-  oslc_client:post_resource(IRI, URI, Options).
+lisp:funct(send, [ResourceIRI, PostURI, Options], true) :- !,
+debug(lisp(oslc), 'POSTing resource [~w] to [~w]', [ResourceIRI, PostURI]),
+  oslc_client:post_resource(ResourceIRI, PostURI, Options).
 
-lisp:funct(send_graph, [Graph, URI], true) :- !,
-  debug(lisp(oslc), 'POSTing graph [~w] to [~w]', [Graph, URI]),
-  oslc_client:post_graph(Graph, URI, []).
+lisp:funct(send_graph, [GraphIRI, PostURI], true) :- !,
+  debug(lisp(oslc), 'POSTing graph [~w] to [~w]', [GraphIRI, PostURI]),
+  oslc_client:post_graph(GraphIRI, PostURI, []).
 
-lisp:funct(send_graph, [Graph, URI, Options], true) :- !,
-  debug(lisp(oslc), 'POSTing graph [~w] to [~w]', [Graph, URI]),
-  oslc_client:post_graph(Graph, URI, Options).
+lisp:funct(send_graph, [GraphIRI, PostURI, Options], true) :- !,
+  debug(lisp(oslc), 'POSTing graph [~w] to [~w]', [GraphIRI, PostURI]),
+  oslc_client:post_graph(GraphIRI, PostURI, Options).
