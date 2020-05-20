@@ -76,6 +76,10 @@ convert_po(P0, P, O0, O, C0, C, Graph) :-
 convert_o(^^(O, _), O, C, C, _) :- !.
 convert_o(@(O, _), O, C, C, _) :- !.
 convert_o(O0, O, C0, C, Graph) :-
+  rdf_list(O0), !,
+  rdf_list(O0, L),
+  convert_list_o(L, O, C0, C, Graph).
+convert_o(O0, O, C0, C, Graph) :-
   rdf_is_bnode(O0), !,
   s_to_dict(O0, C0, C, O, Graph).
 convert_o(O0, O, C0, C, _) :-
@@ -88,6 +92,11 @@ convert_resource(R0, R, C0, C) :-
   format(atom(R), '~w:~w', [Prefix, Local]),
   C = C0.put(Prefix, PrefixIRI).
 convert_resource(R, R, C, C).
+
+convert_list_o([], [], C, C, _) :- !.
+convert_list_o([H0|T0], [H|T], C0, C, Graph) :-
+  convert_o(H0, H, C0, C1, Graph),
+  convert_list_o(T0, T, C1, C, Graph).
 
 % Loading json-ld
 
