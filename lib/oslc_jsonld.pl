@@ -70,13 +70,14 @@ pos_to_dict([P-O|T], C0, C, D0, D, Graph) :-
 convert_po(rdf:type, '@type', O0, O, C0, C, _) :- !,
   convert_resource(O0, O, C0, C).
 convert_po(P0, P, O0, O, C0, C, Graph) :-
-  convert_resource(P0, P, C0, C1),trace,
+  convert_resource(P0, P, C0, C1),
   convert_o(O0, O, C1, C, Graph).
 
 convert_o(^^(O, _), O, C, C, _) :- !.
 convert_o(@(O, _), O, C, C, _) :- !.
 convert_o(O0, O, C0, C, Graph) :-
-  rdf_list(O0, L), !,
+  rdf_list(O0), !,
+  rdf_list(O0, L),
   convert_list_o(L, O, C0, C, Graph).
 convert_o(O0, O, C0, C, Graph) :-
   rdf_is_bnode(O0), !,
@@ -93,9 +94,9 @@ convert_resource(R0, R, C0, C) :-
 convert_resource(R, R, C, C).
 
 convert_list_o([], [], C, C, _) :- !.
-convert_list_o([H|T], [H0|T0], C, C1, Graph) :-
-  convert_o(H, H0, C, C0, Graph),
-  convert_list_o(T, T0, C0, C1, Graph).
+convert_list_o([H0|T0], [H|T], C0, C, Graph) :-
+  convert_o(H0, H, C0, C1, Graph),
+  convert_list_o(T0, T, C1, C, Graph).
 
 % Loading json-ld
 
