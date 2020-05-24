@@ -89,15 +89,32 @@ convert_o(O0, O, C0, C, _) :-
 convert_resource(R0, R, C0, C) :-
   rdf_global_id(Prefix:Local, R0),
   rdf_current_prefix(Prefix, PrefixIRI), !,
-  format(atom(R), '~w:~w', [Prefix, Local]),
-  C = C0.put(Prefix, PrefixIRI).
-convert_resource(R, R, C, C).
+  ( get_dict('@vocab', C0, Vocab)
+  -> ( Vocab = PrefixIRI
+     -> R = Local, C = C0
+     ;  format(atom(R), '~w:~w', [Prefix, Local]), 
+        C = C0.put(Prefix, PrefixIRI) 
+     )
+  ; Vocab = _{'@vocab': PrefixIRI},
+    C = C0.put(Vocab),
+    R = Local
+  ).
+% No prefix exists
+convert_resource(R, R, C, C) :-
+  rdf_global_id(_, R).
+
+% Other option is to store full @ids for each property in the context and use short names in the object.
+% Downside is that context gets large -> could be referenced on a separate URI, see https://www.w3.org/2018/jsonld-cg-reports/json-ld/#the-context
+  % Def = _{'@id': R0},
+  % R = Local,
+  % C = C0.put(Local, Def).
 
 convert_list_o([], [], C, C, _) :- !.
 convert_list_o([H0|T0], [H|T], C0, C, Graph) :-
   convert_o(H0, H, C0, C1, Graph),
   convert_list_o(T0, T, C1, C, Graph).
 
+% NOTE: Loading is not fully compliant with serialization
 % Loading json-ld
 
 rdf_db:rdf_load_stream(jsonld, Stream, Options0) :-
