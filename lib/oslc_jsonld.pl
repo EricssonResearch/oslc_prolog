@@ -73,6 +73,7 @@ convert_po(P0, P, O0, O, C0, C, Graph) :-
   convert_resource(P0, P, C0, C1),
   convert_o(O0, O, C1, C, Graph).
 
+convert_o(^^(B, 'http://www.w3.org/2001/XMLSchema#boolean'), @(B), C, C, _) :- !.
 convert_o(^^(O, _), O, C, C, _) :- !.
 convert_o(@(O, _), O, C, C, _) :- !.
 convert_o(O0, O, C0, C, Graph) :-
