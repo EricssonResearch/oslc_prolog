@@ -48,7 +48,7 @@ s_to_dict(S, C0, C, D, Graph) :-
   ( rdf_is_bnode(S)
   -> C1 = C0,
      D1 = _{}
-  ; convert_resource(S, Id, C0, C1),
+  ; convert_resource_o(S, Id, C0, C1),
     D1 = _{'@id': Id}
   ),
   findall(P-O, rdf(S, P, O, Graph), POs),
@@ -68,7 +68,7 @@ pos_to_dict([P-O|T], C0, C, D0, D, Graph) :-
   pos_to_dict(T, C1, C, D1, D, Graph).
 
 convert_po(rdf:type, '@type', O0, O, C0, C, _) :- !,
-  convert_resource(O0, O, C0, C).
+  convert_resource_o(O0, O, C0, C).
 convert_po(P0, P, O0, O, C0, C, Graph) :-
   convert_resource(P0, P, C0, C1),
   convert_o(O0, O, C1, C, Graph).
@@ -84,7 +84,7 @@ convert_o(O0, O, C0, C, Graph) :-
   rdf_is_bnode(O0), !,
   s_to_dict(O0, C0, C, O, Graph).
 convert_o(O0, O, C0, C, _) :-
-  convert_resource(O0, R, C0, C),
+  convert_resource_o(O0, R, C0, C),
   O = _{'@id': R}.
 
 convert_resource(R0, R, C0, C) :-
@@ -93,8 +93,11 @@ convert_resource(R0, R, C0, C) :-
   ( get_dict('@vocab', C0, Vocab)
   -> ( Vocab = PrefixIRI
      -> R = Local, C = C0
-     ;  format(atom(R), '~w:~w', [Prefix, Local]), 
-        C = C0.put(Prefix, PrefixIRI) 
+      ; % format(atom(R), '~w:~w', [Prefix, Local]), 
+        % C = C0.put(Prefix, PrefixIRI) 
+        Def = _{'@id': R0},
+        R = Local,
+        C = C0.put(Local, Def)
      )
   ; Vocab = _{'@vocab': PrefixIRI},
     C = C0.put(Vocab),
@@ -102,6 +105,23 @@ convert_resource(R0, R, C0, C) :-
   ).
 % No prefix exists
 convert_resource(R, R, C, C) :-
+  rdf_global_id(_, R).
+
+convert_resource_o(R0, R, C0, C) :-
+  rdf_global_id(Prefix:Local, R0),
+  rdf_current_prefix(Prefix, PrefixIRI), !,
+  ( get_dict('@vocab', C0, Vocab)
+  -> ( Vocab = PrefixIRI
+     -> R = Local, C = C0
+      ; format(atom(R), '~w:~w', [Prefix, Local]), 
+        C = C0.put(Prefix, PrefixIRI) 
+     )
+  ; Vocab = _{'@vocab': PrefixIRI},
+    C = C0.put(Vocab),
+    R = Local
+  ).
+% No prefix exists
+convert_resource_o(R, R, C, C) :-
   rdf_global_id(_, R).
 
 % Other option is to store full @ids for each property in the context and use short names in the object.
