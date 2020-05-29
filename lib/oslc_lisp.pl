@@ -20,18 +20,28 @@ limitations under the License.
 
 :- multifile lisp:funct/3.
 
-lisp:funct(send, [ResourceIRI, PostURI], true) :- !,
+call_and_catch(Goal, R) :-
+  catch_with_backtrace((
+      Goal,
+      R = true
+    ),
+    E,
+    ( print_message(error, E),
+      R = false
+    )).
+
+lisp:funct(send, [ResourceIRI, PostURI], R) :- !,
   debug(lisp(oslc), 'POSTing resource [~w] to [~w]', [ResourceIRI, PostURI]),
-  oslc_client:post_resource(ResourceIRI, PostURI, []).
+  call_and_catch(oslc_client:post_resource(ResourceIRI, PostURI, []), R).
 
-lisp:funct(send, [ResourceIRI, PostURI, Options], true) :- !,
+lisp:funct(send, [ResourceIRI, PostURI, Options], R) :- !,
   debug(lisp(oslc), 'POSTing resource [~w] to [~w]', [ResourceIRI, PostURI]),
-  oslc_client:post_resource(ResourceIRI, PostURI, Options).
+  call_and_catch(oslc_client:post_resource(ResourceIRI, PostURI, Options), R).
 
-lisp:funct(send_graph, [GraphIRI, PostURI], true) :- !,
+lisp:funct(send_graph, [GraphIRI, PostURI], R) :- !,
   debug(lisp(oslc), 'POSTing graph [~w] to [~w]', [GraphIRI, PostURI]),
-  oslc_client:post_graph(GraphIRI, PostURI, []).
+  call_and_catch(oslc_client:post_graph(GraphIRI, PostURI, []), R).
 
-lisp:funct(send_graph, [GraphIRI, PostURI, Options], true) :- !,
+lisp:funct(send_graph, [GraphIRI, PostURI, Options], R) :- !,
   debug(lisp(oslc), 'POSTing graph [~w] to [~w]', [GraphIRI, PostURI]),
-  oslc_client:post_graph(GraphIRI, PostURI, Options).
+  call_and_catch(oslc_client:post_graph(GraphIRI, PostURI, Options), R).
