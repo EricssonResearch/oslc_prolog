@@ -30,7 +30,7 @@ limitations under the License.
 :- predicate_options(post_resource/3, 3, [graph(atom), response_graph(atom)]).
 
 post_graph(Graph, URI, Options) :-
-  must_be(atom, Graph),
+  debug(oslc_client, 'POSTing graph [~w] to [~w]', [Graph, URI]),
   option(content_type(ContentType), Options, text/turtle),
   oslc_dispatch:serializer(ContentType, Serializer),
   term_to_atom(ContentType, PostContentType),
@@ -44,8 +44,7 @@ post_graph(Graph, URI, Options) :-
       oslc_dispatch:serialize_response(stream(Out), Graph, Serializer),
       close(Out),
       ( option(response_graph(ResponseGraph), Options)
-      -> must_be(atom, ResponseGraph),
-         setup_call_cleanup(
+      -> setup_call_cleanup(
            new_memory_file(ResponseFile), (
              open_memory_file(ResponseFile, write, ResponseStream, [encoding(octet)]),
              merge_options([headers(ResponseHeaders), to(stream(ResponseStream))], Options1, Options2),
@@ -64,6 +63,7 @@ post_graph(Graph, URI, Options) :-
   ).
 
 post_resource(IRI, URI, Options) :-
+  debug(oslc_client, 'POSTing resource [~w] to [~w]', [IRI, URI]),
   option(graph(Graph), Options, _),
   setup_call_cleanup(
     make_temp_graph(Tmp),
