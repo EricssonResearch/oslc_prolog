@@ -146,7 +146,7 @@ format_response_graph(StatusCode, Graph, Headers, ContentType) :-
   must_be(ground, ContentType),
   format(atom(ContentTypeValue), '~w; charset=utf-8', [ContentType]),
   oslc_dispatch:serializer(ContentType, Serializer), % select proper serializer
-  graph_md5(Graph, Hash),
+  graph_sha1(Graph, Hash),
   append(Headers, ['Content-type'(ContentTypeValue), 'ETag'(Hash), 'Access-Control-Allow-Origin'('*')], NewHeaders),
   response(StatusCode, NewHeaders),
   current_output(Out),

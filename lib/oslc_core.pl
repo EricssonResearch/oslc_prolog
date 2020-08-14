@@ -188,7 +188,7 @@ handle_put0(Context) :-
   IRI = Context.iri,
   autodetect_resource_graph(IRI, Graph),
   once((
-    resource_md5(IRI, Graph, ReceivedHash),
+    resource_sha1(IRI, Graph, ReceivedHash),
     copy_resource(IRI, IRI, rdf(Context.graph_in), rdf(Graph)),
     response(204) % no content
   ; format(atom(Message), 'The value of [If-Match] header does not match [~w]', [Context.iri_spec]),
