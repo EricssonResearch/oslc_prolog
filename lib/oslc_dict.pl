@@ -28,6 +28,9 @@ limitations under the License.
 :- rdf_meta resource_dict_property(r, r, t, -, -, -).
 :- rdf_meta resource_object_key(r, -, t).
 
+% TODO: fix handling of cyclic graphs <a,b,_bnode>, <_bnode,c,_bnode>.
+%       rdf_create_bnode(B), rdf_assert(a,b,B), rdf_assert(B,c,B).
+%       Maybe reuse oslc_rdf:read_resource_tree here instead.
 graph_dict(Graph, Dict, Options) :-
   findall(Subject, (
     rdf(Subject, _, _, Graph),

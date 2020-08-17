@@ -37,6 +37,8 @@ oslc_dispatch:serialize_response(stream(Out), Graph, jsonld) :-
     \+ rdf_is_bnode(S)
   ), List),
   sort(List, Subjects),
+  % TODO: fix handling of cyclic graphs <a,b,_bnode>, <_bnode,c,_bnode>.
+  %       rdf_create_bnode(B), rdf_assert(a,b,B), rdf_assert(B,c,B).
   maplist(ss_to_dict(Graph), Subjects, Dicts),
   json_write(Out, Dicts, [width(0)]).
 
