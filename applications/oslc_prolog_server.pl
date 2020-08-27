@@ -92,7 +92,7 @@ dispatcher0(Request) :-
   check_method(Request, Method),
   check_accept(Request, ContentType),
   ( memberchk(Method, [post,put]) % if POST or PUT request and there is a body, read it
-  -> read_request_body(Request, GraphIn)
+  -> ignore(read_request_body(Request, GraphIn))
   ; true
   ),
   ( memberchk(search(Search), Request),
@@ -220,4 +220,3 @@ read_request_body(Request, GraphIn) :-
     ),
     free_memory_file(MemFile)
   ).
-read_request_body(_, _).

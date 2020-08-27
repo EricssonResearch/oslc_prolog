@@ -218,7 +218,7 @@ select_acceptable_content_type(Request, ContentType) :-
 select_content_type([], _) :- fail.
 select_content_type([media(H,_,_,_)|T], ContentType) :- % go through all requested content types
   ( serializer(H, _)
-  -> !, ContentType = H % if content type is */* then H becomes _VAR/_VAR and matches application/'rdf+xml'
+  -> ContentType = H % if content type is */* then H becomes _VAR/_VAR and matches application/'rdf+xml'
   ; select_content_type(T, ContentType)
   ).
 

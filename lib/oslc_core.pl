@@ -54,7 +54,12 @@ handle_ontology(Context) :-
 output_graph([], _) :- !, fail.
 
 output_graph([One], Context) :- !,
-  Context.graph_out = One.
+  Context.graph_out = One,
+  rdf_graph_property(Context.graph_out, triples(Triples)),
+  ( Triples > 0
+  -> true
+  ; response(204)
+  ).
 
 output_graph(Many, Context) :-
   GraphOut = Context.graph_out,

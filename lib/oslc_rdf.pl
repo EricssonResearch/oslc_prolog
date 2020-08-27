@@ -224,16 +224,25 @@ read_resource_tree_(S, [P-O|T], Graph, Tree0, Tree, BNodes0, BNodes) :-
 
 graph_sha1(Graph, Hash) :-
   must_be(atom, Graph),
-  findall(Subject, rdf(Subject, _, _, Graph), Resources),
-  sort(Resources, SortedResources),
-  empty_assoc(E),
-  graph_sha1_(SortedResources, Graph, [], Forest, E, _),
+  read_graph_forest(Graph, Forest),
   ( [Tree] = Forest
   -> variant_sha1(Tree, Hash)
   ; variant_sha1(Forest, Hash)
   ).
 
-graph_sha1_([], _, Forest, Forest, BNodes, BNodes) :- !.
-graph_sha1_([H|T], Graph, Forest0, Forest, BNodes0, BNodes) :-
+read_graph_forest(Graph, Forest) :-
+  findall(Subject, (
+    rdf(Subject, _, _, Graph),
+    \+ (
+     rdf_is_bnode(Subject),
+     rdf(_, _, Subject, Graph)
+    )
+  ), Resources),
+  sort(Resources, SortedResources),
+  empty_assoc(E),
+  read_graph_forest_(SortedResources, Graph, [], Forest, E, _).
+
+read_graph_forest_([], _, Forest, Forest, BNodes, BNodes) :- !.
+read_graph_forest_([H|T], Graph, Forest0, Forest, BNodes0, BNodes) :-
   read_resource_tree(H, Graph, Tree, BNodes0, BNodes1),
-  graph_sha1_(T, Graph, [Tree|Forest0], Forest, BNodes1, BNodes).
+  read_graph_forest_(T, Graph, [Tree|Forest0], Forest, BNodes1, BNodes).
