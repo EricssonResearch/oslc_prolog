@@ -87,16 +87,26 @@ oslc:delete_property(IRI, PropertyDefinition, tmp(Graph)) :-
   ; oslc:delete_property(IRI, PropertyDefinition, rdf(Graph))
   ).
 
+
+%!  make_temp_graph(-Graph, +Prefix) is det.
+%
+%   Create a new non-persistent (RAM only) graph with unique name prefixed with an atom.
+
+make_temp_graph(Graph, Prefix) :-
+  must_be(var, Graph),
+  uuid(Graph, Prefix),
+  rdf_create_graph(Graph),
+  rdf_persistency(Graph, false),
+  assertz(temp_graph(Graph)).
+
+
 %!  make_temp_graph(-Graph) is det.
 %
 %   Create a new non-persistent (RAM only) graph with unique name.
 
 make_temp_graph(Graph) :-
-  must_be(var, Graph),
-  uuid(Graph),
-  rdf_create_graph(Graph),
-  rdf_persistency(Graph, false),
-  assertz(temp_graph(Graph)).
+  uuid_salt(Prefix),
+  make_temp_graph(Graph, Prefix).
 
 %!  pass_temp_graph(+Graph, +ThreadId) is det.
 %
@@ -138,9 +148,12 @@ clean_temp_graphs :-
 uuid_salt('$oslc_salt_').
 
 uuid(Id) :-
+  uuid_salt(Salt),
+  uuid(Id, Salt).
+
+uuid(Id, Salt) :-
   Max is 1<<128,
   random_between(0, Max, Num),
-  uuid_salt(Salt),
   atom_concat(Salt, Num, Id).
 
 %!  autodetect_resource_graph(+IRI, +Graph) is det.
