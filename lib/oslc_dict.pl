@@ -141,3 +141,11 @@ resource_object_key(Object, Key, Options) :-
     ; Key = Object
     ))
   ).
+
+:- multifile json:json_write_hook/4 .
+json:json_write_hook(date_time(Y,M,D,HH,MM,SS), Stream, _State, _Options) :- !,
+  xsd_time_string(date_time(Y,M,D,HH,MM,SS), 'http://www.w3.org/2001/XMLSchema#dateTime', S),
+  write(Stream, S).
+json:json_write_hook(date_time(Y,M,D,HH,MM,SS,TZ), Stream, _State, _Options) :- !,
+  xsd_time_string(date_time(Y,M,D,HH,MM,SS,TZ), 'http://www.w3.org/2001/XMLSchema#dateTime', S),
+  write(Stream, S).
