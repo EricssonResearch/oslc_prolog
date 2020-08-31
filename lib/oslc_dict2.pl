@@ -14,42 +14,66 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-:- module(oslc_dict2, [ graph_dict/3,
-                        resource_dict/3 ]).
+:- module(oslc_dict2, [ graph_list/3,
+                        resource_dict/3,
+                        name_multireferenced_bnodes/1 ]).
 
 :- use_module(library(semweb/rdf11)).
+:- use_module(library(semweb/rdfs)).
 
-:- predicate_options(graph_dict/3, 3, [ graph(atom),
-                                        skip(list),
+:- predicate_options(graph_list/3, 3, [ skip(list),
                                         lists(boolean),
                                         subject(callable),
                                         property(callable),
                                         resource_key(callable),
                                         label(boolean),
-                                        name(boolean)
+                                        name(boolean),
+                                        multi_bnodes(boolean)
                                       ]).
 
-:- meta_predicate graph_dict(-, -, :),
+:- predicate_options(resource_dict/3, 3, [ graph(atom),
+                                           skip(list),
+                                           lists(boolean),
+                                           subject(callable),
+                                           property(callable),
+                                           resource_key(callable),
+                                           label(boolean),
+                                           name(boolean),
+                                           multi_bnodes(boolean)
+                                         ]).
+
+:- meta_predicate graph_list(-, -, :),
                   resource_dict(-, -, :).
 
-:- rdf_meta graph_dict(r, -, t),
+:- rdf_meta graph_list(r, -, t),
             resource_dict(r, -, t),
-            read_nested_list(r, -, -, -, -).
+            rdf_inlineable_list_(r),
+            read_nested_list(r, -, -, -, -, -, -).
 
-graph_dict(Graph, Dict, Options) :-
-  meta_options(is_meta, Options, Options1),
+graph_list(Graph, List, Options0) :-
+  must_be(atom, Graph),
+  meta_options(is_meta, Options0, Options1),
   ( select(graph(_), Options1, Options2)
-  -> true
-  ; Options2 = Options1
+  -> Options = [graph(Graph)|Options2]
+  ; Options = [graph(Graph)|Options1]
   ),
-  read_graph_forest(Dict, [graph(Graph)|Options2]),
-  name_multireferenced_bnodes(Dict).
+  read_subjects(Top, Rest, Options),
+  empty_assoc(E),
+  read_graph(Top, Rest, [], List, E, _, Options),
+  name_multireferenced_bnodes(List, Options).
 
 is_meta(subject).
 is_meta(property).
 is_meta(resource_key).
 
-name_multireferenced_bnodes(Dict) :-
+name_multireferenced_bnodes(List) :-
+  name_multireferenced_bnodes(List, []).
+
+name_multireferenced_bnodes(_, Options) :-
+  option(multi_bnodes(MBNodes), Options, true),
+  MBNodes \== true, !.
+
+name_multireferenced_bnodes(Dict, _) :-
   term_variables(Dict, Vars),
   term_singletons(Dict, Singletons),
   exclude_singletons(Vars, Singletons, BNodes),
@@ -73,35 +97,61 @@ name_bnodes([H|T], Num) :-
   NextNum is Num + 1,
   name_bnodes(T, NextNum).
 
-read_graph_forest(Forest, Options) :-
+read_graph([], [], List, List, Seen, Seen, _) :- !.
+read_graph([H|T], Rest, List0, List, Seen0, Seen, Options) :-
+  read_graph_tops([H|T], List0, List1, Seen0, Seen1, Rest, Rest1, Options),
+  ( Rest1 = [HR|TR]
+  -> read_graph([HR], TR, List1, List, Seen1, Seen, Options)
+  ; List = List1,
+    Seen = Seen1
+  ).
+
+read_subjects(Top, Rest, Options) :-
   option(graph(Graph), Options, _),
+  ( option(skip(SkipList), Options)
+  -> true
+  ; SkipList = []
+  ),
   findall(Subject, (
-    ( rdf(Subject, _, _, Graph),
-      \+ ( % TODO: also handle situation with dangling cyclic bnodes
-       rdf_is_bnode(Subject),
-       rdf(_, _, Subject, Graph)
-      )
-    ),
-    ( option(skip(SkipList), Options)
-    -> \+ memberchk(s(Subject), SkipList)
-    ; true
-    )
+    rdf(Subject, _, _, Graph),
+    \+ memberchk(s(Subject), SkipList)
   ), SubjectList),
   sort(SubjectList, Subjects),
-  empty_assoc(E),
-  read_graph_forest_(Subjects, [], Forest, E, _, Options).
+  classify_subjects(Subjects, Top, Rest, Graph).
 
-read_graph_forest_([], Forest, Forest, Seen, Seen, _) :- !.
-read_graph_forest_([H|T], Forest0, Forest, Seen0, Seen, Options) :-
-  read_resource_tree(H, Tree, Seen0, Seen1, Options),
-  read_graph_forest_(T, [Tree|Forest0], Forest, Seen1, Seen, Options).
+classify_subjects([], [], [], _) :- !.
+classify_subjects([H|T], [H|T2], Rest, Graph) :-
+  \+ (
+    rdf_is_bnode(H),
+    rdf(_, _, H, Graph)
+  ), !,
+  classify_subjects(T, T2, Rest, Graph).
+classify_subjects([H|T], Top, [H|T2], Graph) :-
+  classify_subjects(T, Top, T2, Graph).
+
+read_graph_tops([], List, List, Seen, Seen, Rest, Rest, _) :- !.
+read_graph_tops([H|T], List0, List, Seen0, Seen, Rest0, Rest, Options) :-
+  ( read_resource_dict(H, Dict, Seen0, Seen1, Rest0, Rest1, Options)
+  -> read_graph_tops(T, [Dict|List0], List, Seen1, Seen, Rest1, Rest, Options)
+  ; read_graph_tops(T, List0, List, Seen0, Seen, Rest0, Rest, Options)
+  ).
 
 resource_dict(Resource, Dict, Options) :-
+  must_be(ground, Resource),
   meta_options(is_meta, Options, Options1),
   empty_assoc(E),
-  read_resource_tree(Resource, Dict, E, _, Options1).
+  read_resource_dict(Resource, Dict, E, _, [], _, Options1),
+  name_multireferenced_bnodes(Dict, Options1).
 
-read_resource_tree(S, Tree, Seen0, Seen, Options) :-
+read_resource_dict(S, _, _, _, _, _, Options) :-
+  option(skip(SkipList), Options),
+  memberchk(s(S), SkipList), !,
+  fail.
+
+read_resource_dict(S, Dict, Seen, Seen, Rest, Rest, _) :-
+  get_assoc(S, Seen, Dict), !.
+
+read_resource_dict(S, Dict, Seen0, Seen, Rest0, Rest, Options) :-
   option(graph(Graph), Options, _),
   findall(P-O, (
     ( var(Graph)
@@ -114,98 +164,109 @@ read_resource_tree(S, Tree, Seen0, Seen, Options) :-
     ; true
     )
   ), POs),
+  ord_subtract(Rest0, [S], Rest1),
   ( rdf_is_bnode(S)
-  -> true
+  -> put_assoc(S, Seen0, Dict0, Seen1)
   ; ( option(subject(Callback), Options),
       apply(Callback, [S, Key, Options])
     -> SV = Key
     ; resource_key(S, SV, Options)
-    )
+    ),
+    put_assoc(S, Seen0, SV, Seen1)
   ),
-  put_assoc(S, Seen0, SV, Seen1),
-  dict_create(Tree0, SV, []),
-  read_resource_tree_(S, POs, Tree0, Tree, Seen1, Seen, Options).
-
-read_resource_tree_(S, [], Tree, Tree, Seen0, Seen, _) :- !,
-  ( rdf_is_bnode(S),
-    get_assoc(S, Seen0, _)
-  -> put_assoc(S, Seen0, Tree, Seen)
-  ; Seen = Seen0
+  dict_create(Dict0, SV, []),
+  ( POs \== []
+  -> read_resource_properties(S, POs, Dict0, Dict, Seen1, Seen, Rest1, Rest, Options)
+  ; Dict = Dict0,
+    Seen = Seen1,
+    Rest = Rest1
   ).
 
-read_resource_tree_(S, [P-O|T], Tree0, Tree, Seen0, Seen, Options) :-
+read_resource_properties(_, [], Dict, Dict, Seen, Seen, Rest, Rest, _) :- !.
+
+read_resource_properties(S, [P-O|T], Dict0, Dict, Seen0, Seen, Rest0, Rest, Options) :-
   option(property(Callback), Options),
   apply(Callback, [S, P, O, Key, Value, Options]), !,
-  add_predicate_value(Key, Value, Tree0, Tree1),
-  read_resource_tree_(S, T, Tree1, Tree, Seen0, Seen, Options).
+  add_predicate_value(Key, Value, Dict0, Dict1),
+  read_resource_properties(S, T, Dict1, Dict, Seen0, Seen, Rest0, Rest, Options).
 
-read_resource_tree_(S, [P-L|T], Tree0, Tree, Seen0, Seen, Options) :-
-  read_literal(L, O), !,
+read_resource_properties(S, [P-O|T], Dict0, Dict, Seen0, Seen, Rest0, Rest, Options) :-
+  read_object(O, OV, Seen0, Seen1, Rest0, Rest1, Options), !,
   resource_key(P, PV, Options),
-  add_predicate_value(PV, O, Tree0, Tree1),
-  read_resource_tree_(S, T, Tree1, Tree, Seen0, Seen, Options).
+  add_predicate_value(PV, OV, Dict0, Dict1),
+  read_resource_properties(S, T, Dict1, Dict, Seen1, Seen, Rest1, Rest, Options).
 
-read_resource_tree_(S, [P-O|T], Tree0, Tree, Seen0, Seen, Options) :-
-  ( get_assoc(O, Seen0, OV)
-  -> resource_key(P, PV, Options),
-     add_predicate_value(PV, OV, Tree0, Tree1),
-     Seen2 = Seen0
-  ; put_assoc(O, Seen0, OV, Seen1),
-    ( option(lists(Lists), Options, true),
-      Lists == true,
-      rdf_list(O)
-    -> read_nested_list(O, OV, Seen1, Seen2, Options),
-       resource_key(P, PV, Options),
-       add_predicate_value(PV, OV, Tree0, Tree1)
-    ; rdf_is_bnode(O)
-    -> read_resource_tree(O, OV, Seen1, Seen2, Options),
-       resource_key(P, PV, Options),
-       add_predicate_value(PV, OV, Tree0, Tree1)
-    ; Seen2 = Seen1,
-      resource_key(P, PV, Options),
-      resource_key(O, OV, Options),
-      add_predicate_value(PV, OV, Tree0, Tree1)
-    )
-  ),
-  read_resource_tree_(S, T, Tree1, Tree, Seen2, Seen, Options).
+read_resource_properties(S, [_|T], Dict0, Dict, Seen0, Seen, Rest0, Rest, Options) :-
+  read_resource_properties(S, T, Dict0, Dict, Seen0, Seen, Rest0, Rest, Options).
+
+read_object(O, OV, Seen, Seen, Rest, Rest, _) :-
+  read_literal(O, OV), !.
+
+read_object(O, OV, Seen, Seen, Rest, Rest, _) :-
+  get_assoc(O, Seen, OV), !.
+
+read_object(O, OV, Seen0, Seen, Rest0, Rest, Options) :-
+  rdf_inlineable_list(O, Options),
+  read_nested_list(O, OV, Seen0, Seen, Rest0, Rest, Options), !.
+
+read_object(O, OV, Seen0, Seen, Rest0, Rest, Options) :-
+  rdf_is_bnode(O),
+  read_resource_dict(O, OV, Seen0, Seen, Rest0, Rest, Options), !.
+
+read_object(O, OV, Seen, Seen, Rest, Rest, Options) :-
+  rdf_is_iri(O), !,
+  ( option(subject(Callback), Options),
+    apply(Callback, [O, OV, Options])
+  -> true
+  ; resource_key(O, OV, Options)
+  ).
 
 read_literal(^^(L, _), L).
 read_literal(@(L, _), L).
 
-read_nested_list(rdf:nil, [], Seen, Seen, _).
-read_nested_list(RDFList, [H|T], Seen0, Seen, Options) :-
-  option(graph(Graph), Options, _),
-  ( ( var(Graph)
-    -> rdf(RDFList, rdf:first, F),
-       rdf(RDFList, rdf:rest, R)
-    ; rdf(RDFList, rdf:first, F, Graph),
-      rdf(RDFList, rdf:rest, R, Graph)
-    )
-  -> ( read_literal(F, H)
-     -> Seen1 = Seen0
-     ; ( read_nested_list(F, H, Seen0, Seen1, Options)
-       -> true
-       ; ( get_assoc(F, Seen0, H)
-         -> Seen1 = Seen0
-         ; read_resource_tree(F, H, Seen0, Seen1, Options)
-         )
-       )
-     ),
-     read_nested_list(R, T, Seen1, Seen, Options)
-  ).
+rdf_inlineable_list(L, Options) :-
+  ( option(lists(Lists), Options, true)
+  -> Lists == true
+  ; true
+  ),
+  rdf_inlineable_list_(L).
+rdf_inlineable_list_(rdf:nil) :- !.
+rdf_inlineable_list_(L) :-
+  rdf_is_bnode(L),
+  findall(F, rdf_has(L, rdf:first, F), [_]),
+  findall(R, rdf_has(L, rdf:rest, R), [ER]),
+  rdf_inlineable_list_(ER).
 
-add_predicate_value(P, O, Tree0, Tree) :-
-  ( get_dict(P, Tree0, OldO)
+read_nested_list(rdf:nil, [], Seen, Seen, Rest, Rest, _).
+
+read_nested_list(S, List, Seen, Seen, Rest, Rest, _) :-
+  get_assoc(S, Seen, List), !.
+
+read_nested_list(S, [H|T], Seen0, Seen, Rest0, Rest, Options) :-
+  option(graph(Graph), Options, _),
+  ( var(Graph)
+  -> rdf(S, rdf:first, F),
+     rdf(S, rdf:rest, R)
+  ; rdf(S, rdf:first, F, Graph),
+    rdf(S, rdf:rest, R, Graph)
+  ), !,
+  put_assoc(S, Seen0, [H|T], Seen1),
+  ord_subtract(Rest0, [S], Rest1),
+  read_object(F, H, Seen1, Seen2, Rest1, Rest2, Options),
+  read_nested_list(R, T, Seen2, Seen, Rest2, Rest, Options).
+
+add_predicate_value(P, O, Dict0, Dict) :-
+  ( get_dict(P, Dict0, OldO)
   -> ( is_list(OldO)
      -> ord_add_element(OldO, O, Obj),
-        put_dict(P, Tree0, Obj, Tree)
+        put_dict(P, Dict0, Obj, Dict)
      ; ( OldO == O
-       -> Tree = Tree0
+       -> Dict = Dict0
        ; ord_add_element([OldO], O, Obj),
-         put_dict(P, Tree0, Obj, Tree)
+         put_dict(P, Dict0, Obj, Dict)
        )
      )
-  ; put_dict(P, Tree0, O, Tree)
+  ; put_dict(P, Dict0, O, Dict)
   ).
 
 resource_key(Resource, Key, Options) :-

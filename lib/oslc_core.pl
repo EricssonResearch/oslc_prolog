@@ -114,7 +114,9 @@ handle_get(Context) :-
   ; Set = []
   )),
   catch((
-    copy_resource([IRI|Set], [IRI|Set], rdf, tmp(Context.graph_out), [inline(rdf)|Context.options])
+    copy_resource([IRI|Set], [IRI|Set], rdf, tmp(Context.graph_out), [inline(rdf)|Context.options]),
+    resource_sha1(IRI, Context.graph_out, Hash),
+    Context.headers = ['ETag'(Hash)]
   ),
     oslc_error(Message),
     throw(response(400, Message)) % bad request (problem with Options)

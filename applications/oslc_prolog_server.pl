@@ -146,8 +146,7 @@ format_response_graph(StatusCode, Graph, Headers, ContentType) :-
   must_be(ground, ContentType),
   format(atom(ContentTypeValue), '~w; charset=utf-8', [ContentType]),
   oslc_dispatch:serializer(ContentType, Serializer), % select proper serializer
-  graph_sha1(Graph, Hash),
-  response(StatusCode, ['Content-type'(ContentTypeValue),'ETag'(Hash),'Access-Control-Allow-Origin'('*')|Headers]),
+  response(StatusCode, ['Content-type'(ContentTypeValue),'Access-Control-Allow-Origin'('*')|Headers]),
   current_output(Out),
   oslc_dispatch:serialize_response(stream(Out), Graph, Serializer). % serialize temporary RDF graph to the response
 

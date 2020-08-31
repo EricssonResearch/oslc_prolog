@@ -19,11 +19,11 @@ limitations under the License.
                       delete_temp_graph/1,
                       clean_temp_graphs/0,
                       autodetect_resource_graph/2,
-                      resource_sha1/3,
-                      graph_sha1/2 ] ).
+                      resource_sha1/3 ] ).
 
 :- use_module(library(semweb/rdf11)).
 :- use_module(library(semweb/rdf_persistency)).
+:- use_module(library(oslc_dict2)).
 :- use_module(library(oslc_types)).
 
 :- rdf_meta autodetect_resource_graph(r, -),
@@ -86,7 +86,6 @@ oslc:delete_property(IRI, PropertyDefinition, tmp(Graph)) :-
   -> make_temp_graph(Graph)
   ; oslc:delete_property(IRI, PropertyDefinition, rdf(Graph))
   ).
-
 
 %!  make_temp_graph(-Graph, +Prefix) is det.
 %
@@ -190,72 +189,5 @@ resource_sha1(IRI, Graph, Hash) :-
   must_be(ground, IRI),
   must_be(atom, Graph),
   rdf_global_id(IRI, S),
-  empty_assoc(E),
-  read_resource_tree(S, Graph, Tree, E, _),
-  variant_sha1(Tree, Hash).
-
-read_resource_tree(S, Graph, Tree, BNodes0, BNodes) :-
-  ( var(Graph)
-  -> findall(P-O, rdf(S, P, O), POs)
-  ; findall(P-O, rdf(S, P, O, Graph), POs)
-  ),
-  ( rdf_is_bnode(S)
-  -> put_assoc(S, BNodes0, SV, BNodes1)
-  ; SV = S,
-    BNodes1 = BNodes0
-  ),
-  dict_create(Tree0, SV, []),
-  read_resource_tree_(S, POs, Graph, Tree0, Tree, BNodes1, BNodes).
-
-read_resource_tree_(S, [], _, Tree, Tree, BNodes0, BNodes) :- !,
-  ( get_assoc(S, BNodes0, _)
-  -> put_assoc(S, BNodes0, Tree, BNodes)
-  ; BNodes = BNodes0
-  ).
-read_resource_tree_(S, [P-O|T], Graph, Tree0, Tree, BNodes0, BNodes) :-
-  ( rdf_is_bnode(O)
-  -> ( get_assoc(O, BNodes0, OV)
-     -> BNodes2 = BNodes0
-     ; put_assoc(O, BNodes0, OV, BNodes1),
-       read_resource_tree(O, Graph, OV, BNodes1, BNodes2)
-     )
-  ; BNodes2 = BNodes0,
-    OV = O
-  ),
-  ( get_dict(P, Tree0, OldOV)
-  -> ord_add_element(OldOV, OV, Obj),
-     put_dict(P, Tree0, Obj, Tree1)
-  ; put_dict(P, Tree0, [OV], Tree1)
-  ),
-  read_resource_tree_(S, T, Graph, Tree1, Tree, BNodes2, BNodes).
-
-%!  graph_sha1(+Graph, -Hash) is det.
-%
-%   Hash is SHA1 hash of content in graph Graph. Names of blank
-%   nodes do not affect the hash. If Graph contains only one resource
-%   =R=, its hash is equal to =|resource_sha1(R, Graph, Hash)|=.
-
-graph_sha1(Graph, Hash) :-
-  must_be(atom, Graph),
-  read_graph_forest(Graph, Forest),
-  ( [Tree] = Forest
-  -> variant_sha1(Tree, Hash)
-  ; variant_sha1(Forest, Hash)
-  ).
-
-read_graph_forest(Graph, Forest) :-
-  findall(Subject, (
-    rdf(Subject, _, _, Graph),
-    \+ (
-     rdf_is_bnode(Subject),
-     rdf(_, _, Subject, Graph)
-    )
-  ), Resources),
-  sort(Resources, SortedResources),
-  empty_assoc(E),
-  read_graph_forest_(SortedResources, Graph, [], Forest, E, _).
-
-read_graph_forest_([], _, Forest, Forest, BNodes, BNodes) :- !.
-read_graph_forest_([H|T], Graph, Forest0, Forest, BNodes0, BNodes) :-
-  read_resource_tree(H, Graph, Tree, BNodes0, BNodes1),
-  read_graph_forest_(T, Graph, [Tree|Forest0], Forest, BNodes1, BNodes).
+  resource_dict(S, Dict, [multi_bnodes(false)]),
+  variant_sha1(Dict, Hash).
