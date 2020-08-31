@@ -166,7 +166,7 @@ read_resource_dict(S, Dict, Seen0, Seen, Rest0, Rest, Options) :-
   ), POs),
   ord_subtract(Rest0, [S], Rest1),
   ( rdf_is_bnode(S)
-  -> put_assoc(S, Seen0, Dict0, Seen1)
+  -> put_assoc(S, Seen0, Dict, Seen1)
   ; ( option(subject(Callback), Options),
       apply(Callback, [S, Key, Options])
     -> SV = Key
