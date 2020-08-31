@@ -166,21 +166,16 @@ read_resource_dict(S, Dict, Seen0, Seen, Rest0, Rest, Options) :-
   ), POs),
   ord_subtract(Rest0, [S], Rest1),
   ( rdf_is_bnode(S)
-  -> put_assoc(S, Seen0, Dict, Seen1)
+  -> true
   ; ( option(subject(Callback), Options),
-      apply(Callback, [S, Key, Options])
-    -> SV = Key
+      apply(Callback, [S, SV, Options])
+    -> true
     ; resource_key(S, SV, Options)
-    ),
-    put_assoc(S, Seen0, SV, Seen1)
+    )
   ),
+  put_assoc(S, Seen0, SV, Seen1),
   dict_create(Dict0, SV, []),
-  ( POs \== []
-  -> read_resource_properties(S, POs, Dict0, Dict, Seen1, Seen, Rest1, Rest, Options)
-  ; Dict = Dict0,
-    Seen = Seen1,
-    Rest = Rest1
-  ).
+  read_resource_properties(S, POs, Dict0, Dict, Seen1, Seen, Rest1, Rest, Options).
 
 read_resource_properties(_, [], Dict, Dict, Seen, Seen, Rest, Rest, _) :- !.
 
