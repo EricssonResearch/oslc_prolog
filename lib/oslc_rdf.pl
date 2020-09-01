@@ -189,5 +189,5 @@ resource_sha1(IRI, Graph, Hash) :-
   must_be(ground, IRI),
   must_be(atom, Graph),
   rdf_global_id(IRI, S),
-  resource_dict(S, Dict, [multi_bnodes(false)]),
+  resource_dict(S, Dict, [graph(Graph), multi_bnodes(false)]),
   variant_sha1(Dict, Hash).

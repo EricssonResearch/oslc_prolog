@@ -48,7 +48,7 @@ limitations under the License.
 :- rdf_meta graph_list(r, -, t),
             resource_dict(r, -, t),
             rdf_inlineable_list_(r),
-            read_nested_list(r, -, -, -, -, -, -).
+            read_nested_list(r, -, -, -, -, -, -, -, -).
 
 graph_list(Graph, List, Options0) :-
   must_be(atom, Graph),
@@ -65,6 +65,29 @@ graph_list(Graph, List, Options0) :-
 is_meta(subject).
 is_meta(property).
 is_meta(resource_key).
+
+read_subjects(Top, Rest, Options) :-
+  option(graph(Graph), Options, _),
+  ( option(skip(SkipList), Options)
+  -> true
+  ; SkipList = []
+  ),
+  findall(Subject, (
+    distinct(Subject, rdf(Subject, _, _, Graph)),
+    \+ memberchk(s(Subject), SkipList)
+  ), SubjectList),
+  sort(SubjectList, Subjects),
+  classify_subjects(Subjects, Top, Rest, Graph).
+
+classify_subjects([], [], [], _) :- !.
+classify_subjects([H|T], [H|T2], Rest, Graph) :-
+  \+ (
+    rdf_is_bnode(H),
+    rdf(_, _, H, Graph)
+  ), !,
+  classify_subjects(T, T2, Rest, Graph).
+classify_subjects([H|T], Top, [H|T2], Graph) :-
+  classify_subjects(T, Top, T2, Graph).
 
 name_multireferenced_bnodes(List) :-
   name_multireferenced_bnodes(List, []).
@@ -98,41 +121,18 @@ name_bnodes([H|T], Num) :-
   name_bnodes(T, NextNum).
 
 read_graph([], [], List, List, Seen, Seen, _) :- !.
-read_graph([H|T], Rest, List0, List, Seen0, Seen, Options) :-
-  read_graph_tops([H|T], List0, List1, Seen0, Seen1, Rest, Rest1, Options),
+read_graph(Top, Rest, List0, List, Seen0, Seen, Options) :-
+  read_graph_tops(Top, List0, List1, Seen0, Seen1, Rest, Rest1, Options),
   ( Rest1 = [HR|TR]
   -> read_graph([HR], TR, List1, List, Seen1, Seen, Options)
   ; List = List1,
     Seen = Seen1
   ).
 
-read_subjects(Top, Rest, Options) :-
-  option(graph(Graph), Options, _),
-  ( option(skip(SkipList), Options)
-  -> true
-  ; SkipList = []
-  ),
-  findall(Subject, (
-    rdf(Subject, _, _, Graph),
-    \+ memberchk(s(Subject), SkipList)
-  ), SubjectList),
-  sort(SubjectList, Subjects),
-  classify_subjects(Subjects, Top, Rest, Graph).
-
-classify_subjects([], [], [], _) :- !.
-classify_subjects([H|T], [H|T2], Rest, Graph) :-
-  \+ (
-    rdf_is_bnode(H),
-    rdf(_, _, H, Graph)
-  ), !,
-  classify_subjects(T, T2, Rest, Graph).
-classify_subjects([H|T], Top, [H|T2], Graph) :-
-  classify_subjects(T, Top, T2, Graph).
-
 read_graph_tops([], List, List, Seen, Seen, Rest, Rest, _) :- !.
 read_graph_tops([H|T], List0, List, Seen0, Seen, Rest0, Rest, Options) :-
-  ( read_resource_dict(H, Dict, Seen0, Seen1, Rest0, Rest1, Options)
-  -> read_graph_tops(T, [Dict|List0], List, Seen1, Seen, Rest1, Rest, Options)
+  ( read_resource_dict(H, Dict, T, Top, Seen0, Seen1, Rest0, Rest1, Options)
+  -> read_graph_tops(Top, [Dict|List0], List, Seen1, Seen, Rest1, Rest, Options)
   ; read_graph_tops(T, List0, List, Seen0, Seen, Rest0, Rest, Options)
   ).
 
@@ -140,18 +140,22 @@ resource_dict(Resource, Dict, Options) :-
   must_be(ground, Resource),
   meta_options(is_meta, Options, Options1),
   empty_assoc(E),
-  read_resource_dict(Resource, Dict, E, _, [], _, Options1),
+  read_resource_dict(Resource, Dict, [], _, E, _, [], _, Options1),
   name_multireferenced_bnodes(Dict, Options1).
 
-read_resource_dict(S, _, _, _, _, _, Options) :-
+read_resource_dict(S, _, _, _, _, _, _, _, Options) :-
   option(skip(SkipList), Options),
   memberchk(s(S), SkipList), !,
   fail.
 
-read_resource_dict(S, Dict, Seen, Seen, Rest, Rest, _) :-
-  get_assoc(S, Seen, Dict), !.
+read_resource_dict(S, Dict, Top, Top, Seen, Seen, Rest, Rest, _) :-
+  get_assoc(S, Seen, Dict),
+  once((
+    \+ rdf_is_bnode(S)
+  ; nonvar(Dict)
+  )), !.
 
-read_resource_dict(S, Dict, Seen0, Seen, Rest0, Rest, Options) :-
+read_resource_dict(S, Dict, Top0, Top, Seen0, Seen, Rest0, Rest, Options) :-
   option(graph(Graph), Options, _),
   findall(P-O, (
     ( var(Graph)
@@ -166,7 +170,7 @@ read_resource_dict(S, Dict, Seen0, Seen, Rest0, Rest, Options) :-
   ), POs),
   ord_subtract(Rest0, [S], Rest1),
   ( rdf_is_bnode(S)
-  -> true
+  -> ignore(get_assoc(S, Seen0, SV))
   ; ( option(subject(Callback), Options),
       apply(Callback, [S, SV, Options])
     -> true
@@ -175,40 +179,45 @@ read_resource_dict(S, Dict, Seen0, Seen, Rest0, Rest, Options) :-
   ),
   put_assoc(S, Seen0, SV, Seen1),
   dict_create(Dict0, SV, []),
-  read_resource_properties(S, POs, Dict0, Dict, Seen1, Seen, Rest1, Rest, Options).
+  read_resource_properties(S, POs, Dict0, Dict, Top0, Top, Seen1, Seen, Rest1, Rest, Options).
 
-read_resource_properties(_, [], Dict, Dict, Seen, Seen, Rest, Rest, _) :- !.
+read_resource_properties(_, [], Dict, Dict, Top, Top, Seen, Seen, Rest, Rest, _) :- !.
 
-read_resource_properties(S, [P-O|T], Dict0, Dict, Seen0, Seen, Rest0, Rest, Options) :-
+read_resource_properties(S, [P-O|T], Dict0, Dict, Top0, Top, Seen0, Seen, Rest0, Rest, Options) :-
   option(property(Callback), Options),
   apply(Callback, [S, P, O, Key, Value, Options]), !,
   add_predicate_value(Key, Value, Dict0, Dict1),
-  read_resource_properties(S, T, Dict1, Dict, Seen0, Seen, Rest0, Rest, Options).
+  read_resource_properties(S, T, Dict1, Dict, Top0, Top, Seen0, Seen, Rest0, Rest, Options).
 
-read_resource_properties(S, [P-O|T], Dict0, Dict, Seen0, Seen, Rest0, Rest, Options) :-
-  read_object(O, OV, Seen0, Seen1, Rest0, Rest1, Options), !,
+read_resource_properties(S, [P-O|T], Dict0, Dict, Top0, Top, Seen0, Seen, Rest0, Rest, Options) :-
+  read_object(O, OV, Top0, Top1, Seen0, Seen1, Rest0, Rest1, Options), !,
   resource_key(P, PV, Options),
   add_predicate_value(PV, OV, Dict0, Dict1),
-  read_resource_properties(S, T, Dict1, Dict, Seen1, Seen, Rest1, Rest, Options).
+  read_resource_properties(S, T, Dict1, Dict, Top1, Top, Seen1, Seen, Rest1, Rest, Options).
 
-read_resource_properties(S, [_|T], Dict0, Dict, Seen0, Seen, Rest0, Rest, Options) :-
-  read_resource_properties(S, T, Dict0, Dict, Seen0, Seen, Rest0, Rest, Options).
+read_resource_properties(S, [_|T], Dict0, Dict, Top0, Top, Seen0, Seen, Rest0, Rest, Options) :-
+  read_resource_properties(S, T, Dict0, Dict, Top0, Top, Seen0, Seen, Rest0, Rest, Options).
 
-read_object(O, OV, Seen, Seen, Rest, Rest, _) :-
+read_object(O, OV, Top, Top, Seen, Seen, Rest, Rest, _) :-
   read_literal(O, OV), !.
 
-read_object(O, OV, Seen, Seen, Rest, Rest, _) :-
+read_object(O, OV, Top, Top, Seen, Seen, Rest, Rest, _) :-
   get_assoc(O, Seen, OV), !.
 
-read_object(O, OV, Seen0, Seen, Rest0, Rest, Options) :-
-  rdf_inlineable_list(O, Options),
-  read_nested_list(O, OV, Seen0, Seen, Rest0, Rest, Options), !.
-
-read_object(O, OV, Seen0, Seen, Rest0, Rest, Options) :-
+read_object(O, OV, Top0, Top, Seen0, Seen, Rest0, Rest, Options) :-
   rdf_is_bnode(O),
-  read_resource_dict(O, OV, Seen0, Seen, Rest0, Rest, Options), !.
+  option(graph(Graph), Options, _),
+  ( findall(O, limit(2, rdf(_, _, O, Graph)), [_])
+  -> ( rdf_inlineable_list(O, Options)
+     -> read_nested_list(O, OV, Top0, Top, Seen0, Seen, Rest0, Rest, Options)
+     ; read_resource_dict(O, OV, Top0, Top, Seen0, Seen, Rest0, Rest, Options)
+     )
+  ; Top = [O|Top0],
+    put_assoc(O, Seen0, OV, Seen),
+    ord_subtract(Rest0, [O], Rest)
+  ), !.
 
-read_object(O, OV, Seen, Seen, Rest, Rest, Options) :-
+read_object(O, OV, Top, Top, Seen, Seen, Rest, Rest, Options) :-
   rdf_is_iri(O), !,
   ( option(subject(Callback), Options),
     apply(Callback, [O, OV, Options])
@@ -227,17 +236,16 @@ rdf_inlineable_list(L, Options) :-
   rdf_inlineable_list_(L).
 rdf_inlineable_list_(rdf:nil) :- !.
 rdf_inlineable_list_(L) :-
-  rdf_is_bnode(L),
-  findall(F, rdf_has(L, rdf:first, F), [_]),
-  findall(R, rdf_has(L, rdf:rest, R), [ER]),
+  findall(F, limit(1, rdf_has(L, rdf:first, F)), [_]),
+  findall(R, limit(1, rdf_has(L, rdf:rest, R)), [ER]),
   rdf_inlineable_list_(ER).
 
-read_nested_list(rdf:nil, [], Seen, Seen, Rest, Rest, _).
+read_nested_list(rdf:nil, [], Top, Top, Seen, Seen, Rest, Rest, _).
 
-read_nested_list(S, List, Seen, Seen, Rest, Rest, _) :-
+read_nested_list(S, List, Top, Top, Seen, Seen, Rest, Rest, _) :-
   get_assoc(S, Seen, List), !.
 
-read_nested_list(S, [H|T], Seen0, Seen, Rest0, Rest, Options) :-
+read_nested_list(S, [H|T], Top0, Top, Seen0, Seen, Rest0, Rest, Options) :-
   option(graph(Graph), Options, _),
   ( var(Graph)
   -> rdf(S, rdf:first, F),
@@ -247,8 +255,8 @@ read_nested_list(S, [H|T], Seen0, Seen, Rest0, Rest, Options) :-
   ), !,
   put_assoc(S, Seen0, [H|T], Seen1),
   ord_subtract(Rest0, [S], Rest1),
-  read_object(F, H, Seen1, Seen2, Rest1, Rest2, Options),
-  read_nested_list(R, T, Seen2, Seen, Rest2, Rest, Options).
+  read_object(F, H, Top0, Top1, Seen1, Seen2, Rest1, Rest2, Options),
+  read_nested_list(R, T, Top1, Top, Seen2, Seen, Rest2, Rest, Options).
 
 add_predicate_value(P, O, Dict0, Dict) :-
   ( get_dict(P, Dict0, OldO)
