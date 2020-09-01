@@ -141,27 +141,3 @@ resource_object_key(Object, Key, Options) :-
     ; Key = Object
     ))
   ).
-
-:- multifile json:json_write_hook/4 .
-json:json_write_hook(date_time(Y,M,D,HH,MM,SS), Stream, _State, _Options) :- !,
-  xsd_time_string(date_time(Y,M,D,HH,MM,SS), 'http://www.w3.org/2001/XMLSchema#dateTime', S),
-  write(Stream, S).
-json:json_write_hook(date_time(Y,M,D,HH,MM,SS,TZ), Stream, _State, _Options) :- !,
-  xsd_time_string(date_time(Y,M,D,HH,MM,SS,TZ), 'http://www.w3.org/2001/XMLSchema#dateTime', S),
-  write(Stream, S).
-
-json:json_write_hook(date(Y,M,D), Stream, _State, _Options) :- !,
-  xsd_time_string(date(Y,M,D), 'http://www.w3.org/2001/XMLSchema#date', S),
-  write(Stream, S).
-
-json:json_write_hook(time(H,M,S), Stream, _State, _Options) :- !,
-  xsd_time_string(time(H,M,S), 'http://www.w3.org/2001/XMLSchema#time', S),
-  write(Stream, S).
-
-json:json_write_hook(year_month(Y,M), Stream, _State, _Options) :- !,
-  xsd_time_string(year_month(Y,M), 'http://www.w3.org/2001/XMLSchema#gYearMonth', S),
-  write(Stream, S).
-
-json:json_write_hook(month_day(M,D), Stream, _State, _Options) :- !,
-  xsd_time_string(month_day(M,D), 'http://www.w3.org/2001/XMLSchema#gMonthDay', S),
-  write(Stream, S).
