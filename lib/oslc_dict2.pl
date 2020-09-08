@@ -27,7 +27,6 @@ limitations under the License.
                                         property(callable),
                                         resource_key(callable),
                                         label(boolean),
-                                        name(boolean),
                                         prefixed(boolean),
                                         multi_bnodes(boolean)
                                       ]).
@@ -39,7 +38,6 @@ limitations under the License.
                                            property(callable),
                                            resource_key(callable),
                                            label(boolean),
-                                           name(boolean),
                                            prefixed(boolean),
                                            multi_bnodes(boolean)
                                          ]).
@@ -283,9 +281,6 @@ resource_key(Resource, Key, Options) :-
       Label == true,
       rdf(Resource, rdfs:label, O^^xsd:string),
       atom_string(Key, O)
-    ; option(name(Name), Options, true),
-      Name == true,
-      rdf_global_id(_:Key, Resource)
     ; option(prefixed(Prefixed), Options, true),
       Prefixed == true,
       rdf_global_id(Prefix:Name, Resource),
