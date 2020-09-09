@@ -34,7 +34,12 @@ literal_types([ rdf:'XMLLiteral',
                 xsd:double,
                 xsd:decimal,
                 xsd:dateTime,
-                xsd:boolean
+                xsd:boolean,
+                xsd:date,
+                xsd:dateTime,
+                xsd:gMonthDay,
+                xsd:gYearMonth,
+                xsd:time
               ]).
 
 is_literal_type(Type) :-
