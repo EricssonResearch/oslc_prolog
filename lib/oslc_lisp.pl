@@ -18,16 +18,16 @@ limitations under the License.
 
 :- use_module(library(oslc_client)).
 
-:- multifile lisp:funct/3.
+:- multifile lisp:func/3.
 
-lisp:funct(send, [ResourceIRI, PostURI], true) :- !,
+lisp:func(send, [ResourceIRI, PostURI], true) :- !,
   oslc_client:post_resource(ResourceIRI, PostURI, []).
 
-lisp:funct(send, [ResourceIRI, PostURI, Options], true) :- !,
+lisp:func(send, [ResourceIRI, PostURI, Options], true) :- !,
   oslc_client:post_resource(ResourceIRI, PostURI, Options).
 
-lisp:funct(send_graph, [GraphIRI, PostURI], true) :- !,
+lisp:func(send_graph, [GraphIRI, PostURI], true) :- !,
   oslc_client:post_graph(GraphIRI, PostURI, []).
 
-lisp:funct(send_graph, [GraphIRI, PostURI, Options], true) :- !,
+lisp:func(send_graph, [GraphIRI, PostURI, Options], true) :- !,
   oslc_client:post_graph(GraphIRI, PostURI, Options).
