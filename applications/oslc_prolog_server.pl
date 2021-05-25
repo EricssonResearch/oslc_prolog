@@ -155,17 +155,11 @@ check_path(Request, Prefix, ResourceSegments) :-
     memberchk(path(Path), Request),
     setting(oslc_prolog_server:prefix_path, PrefixPath),
     atom_concat(PrefixPath, ServicePath, Path), % check if URI called starts with the prefix path
-    ( sub_atom(ServicePath, Before, 1, _, ':')
-    -> sub_atom(ServicePath, 0, Before, _, Prefix),
-       rdf_current_prefix(Prefix, _),
-       After is Before + 1,
-       sub_atom(ServicePath, After, _, 0, SubResource),
-       split_string(SubResource, "/", "/", Parts),
-       strings_to_atoms(Parts, ResourceSegments)
-    ; split_string(ServicePath, "/", "/", Parts),
-      strings_to_atoms(Parts, [Prefix|ResourceSegments]),
-      rdf_current_prefix(Prefix, _)
-    ),
+    re_matchsub("^(?<prefix>\\w*)[:;\\/](?<rest>.*)$"/a, ServicePath, PR, []),
+    Prefix = PR.prefix,
+    rdf_current_prefix(Prefix, _),
+    re_split("\\/(?!\\/)"/a, PR.rest, RestSegments, []),
+    convlist(not_slash, RestSegments, ResourceSegments),
     setting(oslc_prolog_server:exposed_prefixes, ExposedPrefixes),
     once((
       memberchk(Prefix, ExposedPrefixes) % check if prefix is in the list of exposed prefixes
@@ -173,6 +167,9 @@ check_path(Request, Prefix, ResourceSegments) :-
     ))
   ; throw(response(404)) % not found
   )).
+
+not_slash(X, X) :-
+  X \== '/'.
 
 strings_to_atoms([], []) :- !.
 strings_to_atoms([S|T], [A|T2]) :-
