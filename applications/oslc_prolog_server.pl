@@ -88,7 +88,7 @@ dispatcher(Request) :-
   ), clean_temp_graphs).
 
 dispatcher0(Request) :-
-  check_path(Request, Prefix, ResourceSegments),
+  check_path(Request, Prefix, Resource),
   check_method(Request, Method),
   check_accept(Request, ContentType),
   ( memberchk(Method, [post,put]) % if POST or PUT request and there is a body, read it
@@ -105,7 +105,7 @@ dispatcher0(Request) :-
   ),
   once((
     dispatch(_{ request: Request,
-               iri_spec: Prefix:ResourceSegments,
+               iri_spec: Prefix:Resource,
                  method: Method,
            content_type: ContentType,
                graph_in: GraphIn,
@@ -150,16 +150,15 @@ format_response_graph(StatusCode, Graph, Headers, ContentType) :-
   current_output(Out),
   oslc_dispatch:serialize_response(stream(Out), Graph, Serializer). % serialize temporary RDF graph to the response
 
-check_path(Request, Prefix, ResourceSegments) :-
+check_path(Request, Prefix, Resource) :-
   once((
     memberchk(path(Path), Request),
     setting(oslc_prolog_server:prefix_path, PrefixPath),
     atom_concat(PrefixPath, ServicePath, Path), % check if URI called starts with the prefix path
-    re_matchsub("^(?<prefix>\\w*)[:;\\/](?<rest>.*)$"/a, ServicePath, PR, []),
+    re_matchsub("^(?<prefix>\\w*)[:;\\/](?<resource>.*)$"/a, ServicePath, PR, []),
     Prefix = PR.prefix,
     rdf_current_prefix(Prefix, _),
-    re_split("\\/(?!\\/)"/a, PR.rest, RestSegments, []),
-    convlist(not_slash, RestSegments, ResourceSegments),
+    Resource = PR.resource,
     setting(oslc_prolog_server:exposed_prefixes, ExposedPrefixes),
     once((
       memberchk(Prefix, ExposedPrefixes) % check if prefix is in the list of exposed prefixes
@@ -167,9 +166,6 @@ check_path(Request, Prefix, ResourceSegments) :-
     ))
   ; throw(response(404)) % not found
   )).
-
-not_slash(X, X) :-
-  X \== '/'.
 
 strings_to_atoms([], []) :- !.
 strings_to_atoms([S|T], [A|T2]) :-
