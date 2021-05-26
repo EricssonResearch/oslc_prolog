@@ -121,16 +121,15 @@ delete_handler(Method, IRISpec) :-
 % Dispatch an HTTP request to a matching handler with the highest priority (if any).
 % The IRI and its spec are added to the =Context= via =iri= and =iri_spec= keys.
 dispatch(Context) :-
-  _{ iri_spec: Prefix:ResourceSegments,
+  _{ iri_spec: Prefix:Resource,
        method: Method } :< Context,
-  atomic_list_concat(ResourceSegments, '/', Resource),
   findall(handler(Handler, Priority), (
     handler(Method, ISPrefix:ISResource, Handler, Priority),
     match_wildcard(ISPrefix, Prefix, ISResource, Resource)
   ), Handlers),
   predsort(handler_compare, Handlers, SortedHandlers),
   rdf_global_id(Prefix:Resource, IRI),
-  NewContext = Context.put(iri, IRI).put(iri_spec, Prefix:Resource),
+  NewContext = Context.put(iri, IRI),
   dispatch_to_handlers(NewContext, SortedHandlers).
 
 dispatch_to_handlers(Context, [handler(Module:Predicate, _)|T]) :-
