@@ -35,7 +35,7 @@ lisp:func(send_graph, [GraphIRI, PostURI, Options], true) :- !,
   oslc_client:post_graph(GraphIRI, PostURI, Options1).
 
 map_content_type(Options, Options1) :-
-  option(content_type(ContentType), Options),
+  ignore(option(content_type(ContentType), Options)),
   ( var(ContentType)
   -> Options1 = Options
   ; sub_string(ContentType, Before, _, After, "/"),
