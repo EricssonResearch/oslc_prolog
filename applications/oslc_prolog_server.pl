@@ -89,37 +89,54 @@ dispatcher(Request) :-
 
 dispatcher0(Request) :-
   check_path(Request, Prefix, Resource),
-  check_method(Request, Method),
-  check_accept(Request, ContentType),
-  ( memberchk(Method, [post,put]) % if POST or PUT request and there is a body, read it
-  -> ignore(read_request_body(Request, GraphIn))
-  ; true
-  ),
-  ( memberchk(search(Search), Request),
-    findall(Option, (
-      member(Key=Value, Search),
-      atom_concat('oslc.', OP, Key),
-      Option =.. [OP, Value]
-    ), Options)
-  ; Options = []
-  ),
-  once((
-    dispatch(_{ request: Request,
-               iri_spec: Prefix:Resource,
-                 method: Method,
-           content_type: ContentType,
-               graph_in: GraphIn,
-              graph_out: GraphOut,
-                headers: Headers,
-                options: Options }), % main dispatch method
-    ( ground(GraphOut),
-      rdf_graph_property(GraphOut, triples(Triples)),
-      Triples > 0 % the output document is not empty
-    -> format_response_graph(200, GraphOut, Headers, ContentType)
-    ; true % custom dispatcher should form full response by itself
-    )
-  ; throw(response(404)) % not found (failed to dispatch)
-  )).
+  ( member(method(options), Request)
+  -> ignore(preflight(Request))
+  ; check_method(Request, Method),
+    once((
+      memberchk(origin(Origin), Request)
+    ; Origin = (*)
+    )),
+    check_accept(Request, ContentType),
+    ( memberchk(Method, [post,put]) % if POST or PUT request and there is a body, read it
+    -> ignore(read_request_body(Request, GraphIn))
+    ; true
+    ),
+    ( memberchk(search(Search), Request),
+      findall(Option, (
+        member(Key=Value, Search),
+        atom_concat('oslc.', OP, Key),
+        Option =.. [OP, Value]
+      ), Options)
+    ; Options = []
+    ),
+    once((
+      dispatch(_{ request: Request,
+                 iri_spec: Prefix:Resource,
+                   method: Method,
+             content_type: ContentType,
+                 graph_in: GraphIn,
+                graph_out: GraphOut,
+                  headers: Headers,
+                  options: Options }), % main dispatch method
+      ( ground(GraphOut),
+        rdf_graph_property(GraphOut, triples(Triples)),
+        Triples > 0 % the output document is not empty
+      -> format_response_graph(200, GraphOut, Headers, ContentType, Origin)
+      ; true % custom dispatcher should form full response by itself
+      )
+    ; throw(response(404)) % not found (failed to dispatch)
+    ))
+  ).
+
+preflight(Request) :-
+  memberchk(origin(Origin), Request),
+  memberchk(access_control_request_method(_), Request),
+  memberchk(access_control_request_headers(Headers), Request),
+  response(204, ['Access-Control-Allow-Origin'(Origin),
+                 'Access-Control-Allow-Methods'('GET, POST, PUT, DELETE'),
+                 'Access-Control-Allow-Headers'(Headers),
+                 'Access-Control-Allow-Credentials'(true),
+                 'Access-Control-Max-Age'(86400)]).
 
 format_error_response(Request, StatusCode) :-
   format_error_response(Request, StatusCode, _, []).
@@ -138,15 +155,17 @@ format_error_response(Request, StatusCode, Message, Headers) :-
     _,
     oslc_dispatch:serializer(ContentType, _)
   ),
-  format_response_graph(StatusCode, GraphErr, Headers, ContentType).
+  format_response_graph(StatusCode, GraphErr, Headers, ContentType, (*)).
 
-format_response_graph(StatusCode, Graph, Headers, ContentType) :-
+format_response_graph(StatusCode, Graph, Headers, ContentType, Origin) :-
   must_be(integer, StatusCode),
   must_be(ground, Graph),
   must_be(ground, ContentType),
   format(atom(ContentTypeValue), '~w; charset=utf-8', [ContentType]),
   oslc_dispatch:serializer(ContentType, Serializer), % select proper serializer
-  response(StatusCode, ['Content-type'(ContentTypeValue),'Access-Control-Allow-Origin'('*')|Headers]),
+  response(StatusCode, ['Content-type'(ContentTypeValue),
+                        'Access-Control-Allow-Origin'(Origin),
+                        'Access-Control-Allow-Credentials'(true)|Headers]),
   current_output(Out),
   oslc_dispatch:serialize_response(stream(Out), Graph, Serializer). % serialize temporary RDF graph to the response
 
