@@ -24,10 +24,19 @@ lisp:func(send, [ResourceIRI, PostURI], true) :- !,
   oslc_client:post_resource(ResourceIRI, PostURI, []).
 
 lisp:func(send, [ResourceIRI, PostURI, Options], true) :- !,
-  oslc_client:post_resource(ResourceIRI, PostURI, Options).
+  map_content_type(Options, Options1),
+  oslc_client:post_resource(ResourceIRI, PostURI, Options1).
 
 lisp:func(send_graph, [GraphIRI, PostURI], true) :- !,
   oslc_client:post_graph(GraphIRI, PostURI, []).
 
 lisp:func(send_graph, [GraphIRI, PostURI, Options], true) :- !,
-  oslc_client:post_graph(GraphIRI, PostURI, Options).
+  map_content_type(Options, Options1),
+  oslc_client:post_graph(GraphIRI, PostURI, Options1).
+
+map_content_type(Options0, Options) :-
+  ( option(content_type(ContentType), Options0)
+  -> atomic_list_concat([Type,Subtype], "/", ContentType),
+     merge_options([content_type(Type/Subtype)], Options0, Options)
+  ; Options = Options0
+  ).
