@@ -34,13 +34,9 @@ lisp:func(send_graph, [GraphIRI, PostURI, Options], true) :- !,
   map_content_type(Options, Options1),
   oslc_client:post_graph(GraphIRI, PostURI, Options1).
 
-map_content_type(Options, Options1) :-
-  ignore(option(content_type(ContentType), Options)),
-  ( var(ContentType)
-  -> Options1 = Options
-  ; sub_string(ContentType, Before, _, After, "/"),
-    sub_atom(ContentType, 0, Before, _, Type),
-    sub_atom(ContentType, _, After, 0, Subtype),
-    AtomContentType = Type/Subtype,
-    merge_options([content_type(AtomContentType)], Options, Options1)
+map_content_type(Options0, Options) :-
+  ( option(content_type(ContentType), Options0)
+  -> atomic_list_concat([Type,Subtype], "/", ContentType),
+     merge_options([content_type(Type/Subtype)], Options0, Options)
+  ; Options = Options0
   ).
