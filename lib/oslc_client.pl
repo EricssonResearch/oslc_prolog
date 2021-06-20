@@ -31,13 +31,15 @@ limitations under the License.
 
 post_graph(Graph, URI, Options) :-
   debug(oslc_client, 'POSTing graph [~w] to [~w]', [Graph, URI]),
+  % set defaults unless overridden by the user
+  merge_options(Options, [ status_code(200),
+                  request_header('Accept'='text/turtle,application/rdf+xml,application/n-triples')
+                ], OptionsD),
   option(content_type(ContentType), Options, text/turtle),
   oslc_dispatch:serializer(ContentType, Serializer),
   term_to_atom(ContentType, PostContentType),
-  merge_options([ content_type(PostContentType),
-                  status_code(200),
-                  request_header('Accept'='text/turtle,application/rdf+xml,application/n-triples')
-                ], Options, Options1),
+  % rewrite content_type/1 option
+  merge_options([content_type(PostContentType)], OptionsD, Options1),
   setup_call_cleanup(
     new_memory_file(File), (
       open_memory_file(File, write, Out),
