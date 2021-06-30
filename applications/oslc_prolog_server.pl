@@ -18,7 +18,7 @@ limitations under the License.
 
 :- use_module(library(semweb/rdf11)).
 :- use_module(library(http/thread_httpd)).
-:- use_module(library(http/http_client)).
+:- use_module(library(http/http_stream)).
 :- use_module(library(http/http_header)).
 :- use_module(library(http/http_dispatch)).
 :- use_module(library(broadcast)).
@@ -217,25 +217,15 @@ read_request_body(Request, GraphIn) :-
   ; throw(response(415)) % unsupported media type
   )),
   memberchk(input(In), Request),
-  setup_call_cleanup(
-    new_memory_file(MemFile),
-    ( setup_call_cleanup(
-        open_memory_file(MemFile, write, WriteStream, [encoding(octet)]),
-        copy_stream_data(In, WriteStream, ContentLength),
-        close(WriteStream)
-      ),
-      open_memory_file(MemFile, read, Stream, [encoding(utf8)]),
-      catch((
-          make_temp_graph(GraphIn),
-          rdf_load(stream(Stream), [graph(GraphIn), format(Format), silent(true), on_error(error), cache(false)])
-        ),
-        error(E, stream(Stream, Line, Column, _)),
-        (
-          message_to_string(error(E, _), S),
-          format(atom(Message), 'Parsing error (line ~w, column ~w): ~w.', [Line, Column, S]),
-          throw(response(400, Message)) % bad request
-        )
-      )
+  stream_range_open(In, Stream, [size(ContentLength)]),
+  catch((
+      make_temp_graph(GraphIn),
+      rdf_load(stream(Stream), [graph(GraphIn), format(Format), silent(true), on_error(error), cache(false)])
     ),
-    free_memory_file(MemFile)
+    error(E, stream(Stream, Line, Column, _)),
+    (
+      message_to_string(error(E, _), S),
+      format(atom(Message), 'Parsing error (line ~w, column ~w): ~w.', [Line, Column, S]),
+      throw(response(400, Message)) % bad request
+    )
   ).
